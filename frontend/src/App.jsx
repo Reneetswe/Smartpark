@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import ReceptionistDashboard from './pages/ReceptionistDashboard'
 import ManagerDashboard from './pages/ManagerDashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import SiteLayout from './pages/SiteLayout'
 
 function App() {
   return (
@@ -20,7 +21,13 @@ function App() {
               <ReceptionistDashboard />
             </ProtectedRoute>
           } />
-          
+
+          <Route path="/reception/layout" element={
+            <ProtectedRoute allowedRoles={['receptionist']}>
+              <SiteLayout />
+            </ProtectedRoute>
+          } />
+
           <Route path="/manager" element={
             <ProtectedRoute allowedRoles={['manager']}>
               <ManagerDashboard />

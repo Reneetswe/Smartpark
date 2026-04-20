@@ -177,7 +177,7 @@ def update_booking(
 def cancel_booking(
     booking_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["admin", "receptionist"]))
+    current_user: User = Depends(require_role(["admin", "manager", "receptionist"]))
 ):
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:

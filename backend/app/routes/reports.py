@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from typing import List, Dict
 from datetime import date, datetime, timedelta
+from io import StringIO
+import csv
 from app.database import get_db
 from app.models.user import User
 from app.models.site import Site
@@ -172,3 +175,57 @@ def get_alerts(
             })
     
     return {"alerts": alerts}
+
+@router.get("/export/bookings")
+def export_bookings_report(
+    start_date: date = None,
+    end_date: date = None,
+    site_id: int = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["manager", "admin"]))
+):
+    if not start_date:
+        start_date = date.today() - timedelta(days=30)
+    if not end_date:
+        end_date = date.today()
+
+    query = db.query(Booking).join(Site, Booking.site_id == Site.id).filter(
+        Booking.booking_date >= start_date,
+        Booking.booking_date <= end_date
+    )
+
+    if site_id:
+        query = query.filter(Booking.site_id == site_id)
+
+    bookings = query.order_by(Booking.booking_date.desc(), Booking.id.desc()).all()
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Booking ID', 'Reference', 'Customer Name', 'Company', 'Email', 'Phone', 'Site', 'Bay Code', 'Category', 'Date', 'Start Time', 'End Time', 'Status', 'Created At'])
+
+    for booking in bookings:
+        writer.writerow([
+            booking.id,
+            f"BK-{booking.id}",
+            booking.customer_name,
+            booking.customer_company or '',
+            booking.customer_email or '',
+            booking.customer_phone or '',
+            booking.site.name if booking.site else '',
+            booking.space.bay_code if booking.space else '',
+            booking.booking_type,
+            booking.booking_date,
+            booking.start_time,
+            booking.end_time,
+            booking.status,
+            booking.created_at
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type='text/csv',
+        headers={
+            'Content-Disposition': f'attachment; filename=bookings_report_{start_date}_to_{end_date}.csv'
+        }
+    )

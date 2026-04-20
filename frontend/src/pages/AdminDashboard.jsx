@@ -3,7 +3,7 @@ import Navbar from '../components/Navbar'
 import Card from '../components/Card'
 import Toast from '../components/Toast'
 import axios from '../api/axios'
-import { Users, Activity, Shield, AlertCircle, UserPlus, Edit, UserX, X } from 'lucide-react'
+import { Users, Activity, Shield, AlertCircle, UserPlus, Edit, UserX, UserCheck, X } from 'lucide-react'
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([])
@@ -51,7 +51,6 @@ const AdminDashboard = () => {
         recentActions: logsRes.data.length
       })
 
-      // Only 3 roles: receptionist, manager (facilities), admin (IT)
       const rolesData = [
         { id: 1, name: 'receptionist' },
         { id: 2, name: 'manager' },
@@ -60,30 +59,10 @@ const AdminDashboard = () => {
       setRoles(rolesData)
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
-      // Use demo data if API fails - only 3 roles
-      const demoUsers = [
-        { id: 1, full_name: 'Sarah Receptionist', email: 'reception@smartpark.com', role_name: 'receptionist', is_active: true, employee_number: 'REC001' },
-        { id: 2, full_name: 'Michael Facilities Manager', email: 'manager@smartpark.com', role_name: 'manager', is_active: true, employee_number: 'MGR001' },
-        { id: 3, full_name: 'IT Admin', email: 'admin@smartpark.com', role_name: 'admin', is_active: true, employee_number: 'ADM001' }
-      ]
-      setUsers(demoUsers)
-      setStats({
-        totalUsers: 3,
-        activeUsers: 3,
-        inactiveUsers: 0,
-        recentActions: 10
+      setToast({ 
+        message: 'Failed to load dashboard data. Please check API connection.', 
+        type: 'error' 
       })
-      setActivityLogs([
-        { id: 1, user_name: 'Sarah Receptionist', action: 'Created customer booking', entity_type: 'booking', created_at: new Date().toISOString() },
-        { id: 2, user_name: 'Michael Facilities Manager', action: 'Approved booking', entity_type: 'booking', created_at: new Date().toISOString() }
-      ])
-      // Only 3 roles: receptionist, manager (facilities), admin (IT)
-      const rolesData = [
-        { id: 1, name: 'receptionist' },
-        { id: 2, name: 'manager' },
-        { id: 3, name: 'admin' }
-      ]
-      setRoles(rolesData)
     }
   }
 
@@ -128,7 +107,7 @@ const AdminDashboard = () => {
   }
 
   const handleDeactivateUser = async (userId) => {
-    if (!confirm('Are you sure you want to deactivate this user?')) return
+    if (!confirm('Are you sure you want to deactivate this user? They will not be able to log in.')) return
 
     try {
       await axios.patch(`/api/users/${userId}/deactivate`)
@@ -136,6 +115,18 @@ const AdminDashboard = () => {
       fetchDashboardData()
     } catch (error) {
       setToast({ message: 'Error deactivating user', type: 'error' })
+    }
+  }
+
+  const handleReactivateUser = async (userId) => {
+    if (!confirm('Are you sure you want to reactivate this user?')) return
+
+    try {
+      await axios.patch(`/api/users/${userId}/reactivate`)
+      setToast({ message: 'User reactivated successfully', type: 'success' })
+      fetchDashboardData()
+    } catch (error) {
+      setToast({ message: 'Error reactivating user', type: 'error' })
     }
   }
 
@@ -240,18 +231,19 @@ const AdminDashboard = () => {
               <h2 className="text-xl font-bold text-gray-900 mb-6">User Management</h2>
               
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Name</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Email</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Role</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {users.map(user => (
+                {users.length > 0 ? (
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Email</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Role</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {users.map(user => (
                       <tr key={user.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm text-gray-900">{user.full_name}</td>
                         <td className="px-4 py-3 text-sm text-gray-600">{user.email}</td>
@@ -276,21 +268,35 @@ const AdminDashboard = () => {
                             >
                               <Edit className="h-4 w-4" />
                             </button>
-                            {user.is_active && (
+                            {user.is_active ? (
                               <button
                                 onClick={() => handleDeactivateUser(user.id)}
                                 className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                title="Deactivate"
+                                title="Deactivate User"
                               >
                                 <UserX className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleReactivateUser(user.id)}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                title="Reactivate User"
+                              >
+                                <UserCheck className="h-4 w-4" />
                               </button>
                             )}
                           </div>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <Users className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-sm">No users found. Check API connection.</p>
+                  </div>
+                )}
               </div>
             </Card>
           </div>
@@ -302,15 +308,29 @@ const AdminDashboard = () => {
                 Activity Logs
               </h2>
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {activityLogs.map(log => (
-                  <div key={log.id} className="border-l-2 border-blue-600 pl-3 py-2">
-                    <p className="text-sm font-medium text-gray-900">{log.action}</p>
-                    <p className="text-xs text-gray-600">{log.user_name}</p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(log.created_at).toLocaleString()}
-                    </p>
+                {activityLogs.length > 0 ? (
+                  activityLogs.map(log => (
+                    <div key={log.id} className="border-l-2 border-blue-600 pl-3 py-2">
+                      <p className="text-sm font-medium text-gray-900">{log.action}</p>
+                      <p className="text-xs text-gray-600">{log.user_name}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(log.created_at).toLocaleString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Activity className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p className="text-sm">No activity logs yet</p>
                   </div>
-                ))}
+                )}
               </div>
             </Card>
           </div>

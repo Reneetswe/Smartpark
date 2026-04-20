@@ -119,24 +119,7 @@ const LoginPage = () => {
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <p className="text-sm text-gray-600 text-center mb-4">Demo Credentials:</p>
-            <div className="grid grid-cols-3 gap-3 text-xs">
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="font-semibold text-gray-700">Receptionist</p>
-                <p className="text-gray-600">reception@smartpark.com</p>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="font-semibold text-gray-700">Manager</p>
-                <p className="text-gray-600">manager@smartpark.com</p>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="font-semibold text-gray-700">Admin</p>
-                <p className="text-gray-600">admin@smartpark.com</p>
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 text-center mt-3">Password: password123</p>
-          </div>
+          
         </div>
 
         <p className="text-center text-sm text-gray-600 mt-6">

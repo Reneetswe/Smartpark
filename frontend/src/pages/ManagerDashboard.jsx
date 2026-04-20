@@ -18,6 +18,25 @@ const ManagerDashboard = () => {
     fetchDashboardData()
   }, [])
 
+  const handleExportReport = async () => {
+    try {
+      const response = await axios.get('/api/reports/export/bookings', {
+        responseType: 'blob'
+      })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `bookings_report_${new Date().toISOString().split('T')[0]}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setToast({ message: 'Report exported successfully', type: 'success' })
+    } catch (error) {
+      console.error('Export error:', error)
+      setToast({ message: 'Failed to export report', type: 'error' })
+    }
+  }
+
   const fetchDashboardData = async () => {
     try {
       const [sitesRes, utilizationRes, bookingsRes, alertsRes] = await Promise.all([
@@ -228,7 +247,7 @@ const ManagerDashboard = () => {
         <Card className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-gray-900">Recent Bookings</h2>
-            <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+            <button onClick={handleExportReport} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
               Export Report
             </button>
           </div>

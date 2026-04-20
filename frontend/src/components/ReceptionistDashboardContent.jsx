@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   AlertCircle,
   Ban,
@@ -84,10 +85,10 @@ const getDurationLabel = (start, end) => {
 const compareBayCodes = (left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })
 
 const ReceptionistDashboardContent = () => {
+  const navigate = useNavigate()
   const [sites, setSites] = useState([])
   const [bookings, setBookings] = useState([])
   const [availableSpaceCount, setAvailableSpaceCount] = useState(0)
-  const [layoutSpaces, setLayoutSpaces] = useState([])
   const [searchResults, setSearchResults] = useState([])
   const [selectedSpace, setSelectedSpace] = useState(null)
   const [showBookingModal, setShowBookingModal] = useState(false)
@@ -113,15 +114,11 @@ const ReceptionistDashboardContent = () => {
     bookings: false,
     summary: false,
     results: false,
-    layout: false,
-    creating: false,
-    cancellingId: null,
   })
   const [errors, setErrors] = useState({
     sites: '',
     bookings: '',
     results: '',
-    layout: '',
   })
 
   const siteMap = useMemo(() => Object.fromEntries(sites.map((site) => [site.id, site])), [sites])
@@ -153,26 +150,6 @@ const ReceptionistDashboardContent = () => {
     return items
   }, [resultControls.category, resultControls.sort, searchResults])
 
-  const groupedLayoutSpaces = useMemo(() => {
-    const groups = CATEGORY_OPTIONS.filter((option) => option.value).map((option) => ({
-      key: option.value,
-      label: option.label,
-      spaces: layoutSpaces
-        .filter((space) => space.category === option.value)
-        .sort((a, b) => compareBayCodes(a.bay_code, b.bay_code)),
-    }))
-
-    const uncategorized = layoutSpaces
-      .filter((space) => !CATEGORY_OPTIONS.some((option) => option.value === space.category))
-      .sort((a, b) => compareBayCodes(a.bay_code, b.bay_code))
-
-    if (uncategorized.length) {
-      groups.push({ key: 'other', label: 'Other', spaces: uncategorized })
-    }
-
-    return groups
-  }, [layoutSpaces])
-
   useEffect(() => {
     const loadDashboard = async () => {
       setLoading((current) => ({ ...current, initial: true }))
@@ -182,16 +159,6 @@ const ReceptionistDashboardContent = () => {
 
     loadDashboard()
   }, [])
-
-  useEffect(() => {
-    if (!searchForm.site_id) {
-      setLayoutSpaces([])
-      setErrors((current) => ({ ...current, layout: '' }))
-      return
-    }
-
-    fetchLayoutSpaces(searchForm.site_id)
-  }, [searchForm.site_id])
 
   const fetchSites = async () => {
     setLoading((current) => ({ ...current, sites: true }))
@@ -234,26 +201,6 @@ const ReceptionistDashboardContent = () => {
       setToast({ message: error.response?.data?.detail || 'Unable to load dashboard counts.', type: 'error' })
     } finally {
       setLoading((current) => ({ ...current, summary: false }))
-    }
-  }
-
-  const fetchLayoutSpaces = async (siteId) => {
-    if (!siteId) {
-      setLayoutSpaces([])
-      return
-    }
-
-    setLoading((current) => ({ ...current, layout: true }))
-    setErrors((current) => ({ ...current, layout: '' }))
-
-    try {
-      const response = await axios.get('/api/spaces', { params: { site_id: Number(siteId) } })
-      setLayoutSpaces(response.data)
-    } catch (error) {
-      setLayoutSpaces([])
-      setErrors((current) => ({ ...current, layout: error.response?.data?.detail || 'Unable to load the site layout.' }))
-    } finally {
-      setLoading((current) => ({ ...current, layout: false }))
     }
   }
 
@@ -432,65 +379,42 @@ const ReceptionistDashboardContent = () => {
     return 'bg-slate-100 text-slate-700 border-slate-200'
   }
 
-  const getLayoutClasses = (space) => {
-    if (!space.is_active || ['blocked', 'maintenance'].includes(space.status)) {
-      return 'bg-slate-200 text-slate-600 border-slate-300'
-    }
-
-    if (searched && Number(searchForm.site_id) === space.site_id && availableResultIds.has(space.id)) {
-      return 'bg-emerald-100 text-emerald-700 border-emerald-200'
-    }
-
-    if (space.category === 'ev') {
-      return 'bg-blue-100 text-blue-700 border-blue-200'
-    }
-
-    if (space.category === 'disabled') {
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-    }
-
-    if (space.category === 'visitor') {
-      return 'bg-purple-100 text-purple-700 border-purple-200'
-    }
-
-    if (['occupied', 'reserved'].includes(space.status)) {
-      return 'bg-red-100 text-red-700 border-red-200'
-    }
-
-    return 'bg-emerald-100 text-emerald-700 border-emerald-200'
-  }
-
   const isBusy = loading.initial && !sites.length && !bookings.length
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="mb-5 flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">Receptionist Admin</p>
-            <h1 className="text-3xl font-bold text-gray-900">Receptionist Dashboard</h1>
-            <p className="mt-2 text-gray-600">Manage bookings, assist staff and visitors, and monitor parking availability.</p>
+            <h1 className="text-2xl font-bold text-gray-900">Receptionist Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-600">Search, book, and manage parking spaces</p>
           </div>
 
-          <button
-            onClick={() => {
-              fetchSites()
-              fetchBookings()
-              fetchAvailableSpaceSummary()
-              if (searchForm.site_id) {
-                fetchLayoutSpaces(searchForm.site_id)
-              }
-            }}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Refresh dashboard
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigate('/reception/layout')}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              <MapPinned className="h-4 w-4" />
+              Site Layout
+            </button>
+            <button
+              onClick={() => {
+                fetchSites()
+                fetchBookings()
+                fetchAvailableSpaceSummary()
+              }}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Refresh
+            </button>
+          </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="mb-5 grid gap-3 md:grid-cols-3">
           {[
             {
               title: 'Available Spaces Today',
@@ -514,14 +438,14 @@ const ReceptionistDashboardContent = () => {
             const Icon = card.icon
 
             return (
-              <Card key={card.title} className="p-5">
+              <Card key={card.title} className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500">{card.title}</p>
-                    <p className="mt-3 text-3xl font-bold text-gray-900">{loading.summary && card.title === 'Available Spaces Today' ? '...' : card.value}</p>
+                    <p className="text-xs font-medium text-gray-500">{card.title}</p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900">{loading.summary && card.title === 'Available Spaces Today' ? '...' : card.value}</p>
                   </div>
-                  <div className={`rounded-2xl p-3 ${card.tone}`}>
-                    <Icon className="h-6 w-6" />
+                  <div className={`rounded-xl p-2.5 ${card.tone}`}>
+                    <Icon className="h-5 w-5" />
                   </div>
                 </div>
               </Card>
@@ -706,18 +630,18 @@ const ReceptionistDashboardContent = () => {
                 )}
               </div>
             </Card>
+          </div>
 
+          <div>
             <Card className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Recent Bookings</h2>
-                  <p className="mt-1 text-sm text-gray-500">Live bookings from the database, updated after every booking or cancellation.</p>
-                </div>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Recent Bookings</h2>
+                <p className="mt-1 text-sm text-gray-500">Live bookings from the database</p>
               </div>
 
-              <div className="mt-5 overflow-x-auto">
+              <div className="overflow-x-auto">
                 {errors.bookings ? (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                     <p className="font-semibold">Unable to load recent bookings</p>
                     <p className="mt-1">{errors.bookings}</p>
                     <button onClick={fetchBookings} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700">
@@ -732,57 +656,51 @@ const ReceptionistDashboardContent = () => {
                     ))}
                   </div>
                 ) : !recentBookings.length ? (
-                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
                     <CalendarDays className="mx-auto h-10 w-10 text-gray-400" />
                     <h3 className="mt-4 text-lg font-semibold text-gray-900">No bookings yet</h3>
-                    <p className="mt-2 text-sm text-gray-500">Bookings created by the receptionist will appear here immediately.</p>
+                    <p className="mt-2 text-sm text-gray-500">Bookings will appear here immediately</p>
                   </div>
                 ) : (
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead>
-                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-                        <th className="px-4 py-3">Booking Reference</th>
-                        <th className="px-4 py-3">Name</th>
-                        <th className="px-4 py-3">Site</th>
-                        <th className="px-4 py-3">Bay Number</th>
-                        <th className="px-4 py-3">Category</th>
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3">Time</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Actions</th>
+                      <tr className="text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                        <th className="px-3 py-2">Reference</th>
+                        <th className="px-3 py-2">Name</th>
+                        <th className="px-3 py-2">Bay</th>
+                        <th className="px-3 py-2">Date</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white text-sm text-gray-700">
-                      {recentBookings.map((booking) => (
+                      {recentBookings.slice(0, 10).map((booking) => (
                         <tr key={booking.id}>
-                          <td className="px-4 py-4 font-semibold text-gray-900">{booking.booking_reference || `BK-${booking.id}`}</td>
-                          <td className="px-4 py-4">{booking.customer_name}</td>
-                          <td className="px-4 py-4">{booking.site_name || getSiteName(booking.site_id)}</td>
-                          <td className="px-4 py-4">{booking.bay_code || '-'}</td>
-                          <td className="px-4 py-4">{getCategoryLabel(booking.booking_type)}</td>
-                          <td className="px-4 py-4">{formatDate(booking.booking_date)}</td>
-                          <td className="px-4 py-4">{formatTime(booking.start_time)} - {formatTime(booking.end_time)}</td>
-                          <td className="px-4 py-4">
-                            <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusBadgeClasses(booking.status)}`}>
-                              {booking.status === 'cancelled' ? 'Cancelled' : booking.status}
+                          <td className="px-3 py-3 font-semibold text-gray-900">{booking.booking_reference || `BK-${booking.id}`}</td>
+                          <td className="px-3 py-3">{booking.customer_name}</td>
+                          <td className="px-3 py-3">{booking.bay_code || '-'}</td>
+                          <td className="px-3 py-3">{formatDate(booking.booking_date)}</td>
+                          <td className="px-3 py-3">
+                            <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${getStatusBadgeClasses(booking.status)}`}>
+                              {booking.status}
                             </span>
                           </td>
-                          <td className="px-4 py-4">
-                            <div className="flex flex-wrap gap-2">
+                          <td className="px-3 py-3">
+                            <div className="flex gap-2">
                               <button
                                 onClick={() => setViewBooking(booking)}
-                                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100"
                               >
-                                <Eye className="h-3.5 w-3.5" />
+                                <Eye className="h-3 w-3" />
                                 View
                               </button>
                               <button
                                 onClick={() => handleCancelBooking(booking.id)}
                                 disabled={booking.status === 'cancelled' || loading.cancellingId === booking.id}
-                                className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                {loading.cancellingId === booking.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
-                                Cancel Booking
+                                {loading.cancellingId === booking.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3 w-3" />}
+                                Cancel
                               </button>
                             </div>
                           </td>
@@ -793,105 +711,6 @@ const ReceptionistDashboardContent = () => {
                 )}
               </div>
             </Card>
-          </div>
-
-          <div className="space-y-8">
-            <Card className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Site Layout Preview</h2>
-                  <p className="mt-1 text-sm text-gray-500">Read-only visual bay overview for the selected site.</p>
-                </div>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-gray-600">
-                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Available</span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1"><span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Occupied</span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-500" /> Unavailable</span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Electric</span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-yellow-50 px-3 py-1"><span className="h-2.5 w-2.5 rounded-full bg-yellow-500" /> Disabled</span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-purple-50 px-3 py-1"><span className="h-2.5 w-2.5 rounded-full bg-purple-500" /> Visitor</span>
-              </div>
-
-              <div className="mt-5">
-                {!searchForm.site_id ? (
-                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-                    <MapPinned className="mx-auto h-10 w-10 text-gray-400" />
-                    <h3 className="mt-4 text-lg font-semibold text-gray-900">Select a site to preview the layout</h3>
-                    <p className="mt-2 text-sm text-gray-500">The layout preview uses real bay records from the selected site.</p>
-                  </div>
-                ) : errors.layout ? (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-                    <p className="font-semibold">Unable to load site layout</p>
-                    <p className="mt-1">{errors.layout}</p>
-                    <button onClick={() => fetchLayoutSpaces(searchForm.site_id)} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700">
-                      <RefreshCcw className="h-4 w-4" />
-                      Retry
-                    </button>
-                  </div>
-                ) : loading.layout ? (
-                  <div className="grid gap-4">
-                    {Array.from({ length: 2 }).map((_, index) => (
-                      <div key={index} className="animate-pulse rounded-2xl border border-gray-200 bg-white p-4">
-                        <div className="h-4 w-28 rounded bg-gray-200" />
-                        <div className="mt-4 grid grid-cols-3 gap-2">
-                          {Array.from({ length: 6 }).map((__, itemIndex) => (
-                            <div key={itemIndex} className="h-12 rounded-xl bg-gray-200" />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : !layoutSpaces.length ? (
-                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-                    <MapPinned className="mx-auto h-10 w-10 text-gray-400" />
-                    <h3 className="mt-4 text-lg font-semibold text-gray-900">No bays found for this site</h3>
-                    <p className="mt-2 text-sm text-gray-500">The selected site does not currently return any active parking spaces.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {groupedLayoutSpaces.map((group) => (
-                      <div key={group.key} className="rounded-2xl border border-gray-200 p-4">
-                        <div className="mb-3 flex items-center justify-between">
-                          <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">{group.label}</h3>
-                          <span className="text-xs font-medium text-gray-400">{group.spaces.length} bays</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                          {group.spaces.map((space) => (
-                            <div key={space.id} className={`rounded-xl border px-3 py-3 text-center text-xs font-semibold ${getLayoutClasses(space)}`}>
-                              <div>{space.bay_code}</div>
-                              <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.12em]">{space.status}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            {lastConfirmedBooking && (
-              <Card className="p-5">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600">
-                    <CheckCircle2 className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900">Latest confirmed booking</h2>
-                    <p className="mt-1 text-sm text-gray-500">Reference {lastConfirmedBooking.booking_reference || `BK-${lastConfirmedBooking.id}`}</p>
-                    <div className="mt-4 grid gap-2 text-sm text-gray-600">
-                      <p><span className="font-semibold text-gray-900">Name:</span> {lastConfirmedBooking.customer_name}</p>
-                      <p><span className="font-semibold text-gray-900">Parking Number:</span> {lastConfirmedBooking.bay_code}</p>
-                      <p><span className="font-semibold text-gray-900">Duration:</span> {lastConfirmedBooking.duration}</p>
-                      <p><span className="font-semibold text-gray-900">Time Window:</span> {formatDateTimeWindow(lastConfirmedBooking.booking_date, lastConfirmedBooking.start_time, lastConfirmedBooking.end_time)}</p>
-                      <p><span className="font-semibold text-gray-900">Status:</span> {lastConfirmedBooking.status}</p>
-                      {lastConfirmedBooking.employee_number ? <p><span className="font-semibold text-gray-900">Employee Number:</span> {lastConfirmedBooking.employee_number}</p> : null}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            )}
           </div>
         </div>
       </div>
