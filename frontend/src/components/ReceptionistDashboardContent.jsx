@@ -269,9 +269,17 @@ const ReceptionistDashboardContent = () => {
     }
   }
 
-  const handleSearchSubmit = async (event) => {
+  const handleSearchSubmit = (event) => {
     event.preventDefault()
-    await runSearch()
+    if (!validateSearchForm()) return
+    const params = new URLSearchParams({
+      site_id: searchForm.site_id,
+      booking_date: searchForm.booking_date,
+      start_time: searchForm.start_time,
+      end_time: searchForm.end_time,
+    })
+    if (searchForm.category) params.set('category', searchForm.category)
+    navigate(`/reception/layout?${params.toString()}`)
   }
 
   const handleOpenBookingModal = (space) => {
@@ -525,194 +533,90 @@ const ReceptionistDashboardContent = () => {
           </form>
         </Card>
 
-        <div className="grid gap-8 xl:grid-cols-[1.4fr_1fr]">
-          <div className="space-y-8">
-            <Card className="p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Available Spaces</h2>
-                  <p className="mt-1 text-sm text-gray-500">Search-first workflow with live bay availability from the backend.</p>
-                </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <select
-                    value={resultControls.sort}
-                    onChange={(event) => setResultControls((current) => ({ ...current, sort: event.target.value }))}
-                    className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  >
-                    <option value="bay">Sort by bay number</option>
-                  </select>
-
-                  <select
-                    value={resultControls.category}
-                    onChange={(event) => setResultControls((current) => ({ ...current, category: event.target.value }))}
-                    className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  >
-                    {CATEGORY_OPTIONS.map((option) => (
-                      <option key={`result-${option.label}`} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-
-                  <button
-                    onClick={() => setResultControls({ sort: 'bay', category: '' })}
-                    className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
-                  >
-                    Clear filters
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-5">
-                {errors.results ? (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="mt-0.5 h-5 w-5" />
-                      <div>
-                        <p className="font-semibold">Unable to load search results</p>
-                        <p className="mt-1">{errors.results}</p>
-                        <button onClick={() => runSearch()} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700">
-                          <RefreshCcw className="h-4 w-4" />
-                          Retry search
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : loading.results ? (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {Array.from({ length: 4 }).map((_, index) => (
-                      <div key={index} className="animate-pulse rounded-2xl border border-gray-200 bg-white p-5">
-                        <div className="h-4 w-24 rounded bg-gray-200" />
-                        <div className="mt-4 h-3 w-36 rounded bg-gray-200" />
-                        <div className="mt-2 h-3 w-28 rounded bg-gray-200" />
-                        <div className="mt-6 h-10 rounded-xl bg-gray-200" />
-                      </div>
-                    ))}
-                  </div>
-                ) : !searched ? (
-                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-                    <Search className="mx-auto h-10 w-10 text-gray-400" />
-                    <h3 className="mt-4 text-lg font-semibold text-gray-900">Start with a live availability search</h3>
-                    <p className="mt-2 text-sm text-gray-500">Choose a site, date, time window, and parking category to see real available bays.</p>
-                  </div>
-                ) : !filteredResults.length ? (
-                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-                    <CarFront className="mx-auto h-10 w-10 text-gray-400" />
-                    <h3 className="mt-4 text-lg font-semibold text-gray-900">No spaces available</h3>
-                    <p className="mt-2 text-sm text-gray-500">No real bays matched the selected site, date, time range, and category.</p>
-                  </div>
-                ) : (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {filteredResults.map((space) => (
-                      <div key={space.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Bay Number</p>
-                            <h3 className="mt-2 text-xl font-bold text-gray-900">{space.bay_code}</h3>
-                          </div>
-                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Available</span>
-                        </div>
-
-                        <div className="mt-5 grid gap-3 text-sm text-gray-600">
-                          <div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-gray-400" /> {getSiteName(space.site_id)}</div>
-                          <div className="flex items-center gap-2"><MapPinned className="h-4 w-4 text-gray-400" /> {getCategoryLabel(space.category)}</div>
-                          <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-gray-400" /> {formatDateTimeWindow(searchForm.booking_date, searchForm.start_time, searchForm.end_time)}</div>
-                        </div>
-
-                        <button
-                          onClick={() => handleOpenBookingModal(space)}
-                          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-800"
-                        >
-                          Book Now
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </Card>
+        <Card className="p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Recent Bookings</h2>
+            <p className="mt-1 text-sm text-gray-500">Live bookings from the database</p>
           </div>
 
-          <div>
-            <Card className="p-5">
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Recent Bookings</h2>
-                <p className="mt-1 text-sm text-gray-500">Live bookings from the database</p>
+          <div className="overflow-x-auto">
+            {errors.bookings ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                <p className="font-semibold">Unable to load recent bookings</p>
+                <p className="mt-1">{errors.bookings}</p>
+                <button onClick={fetchBookings} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700">
+                  <RefreshCcw className="h-4 w-4" />
+                  Retry
+                </button>
               </div>
-
-              <div className="overflow-x-auto">
-                {errors.bookings ? (
-                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                    <p className="font-semibold">Unable to load recent bookings</p>
-                    <p className="mt-1">{errors.bookings}</p>
-                    <button onClick={fetchBookings} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700">
-                      <RefreshCcw className="h-4 w-4" />
-                      Retry
-                    </button>
-                  </div>
-                ) : loading.bookings && !recentBookings.length ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 5 }).map((_, index) => (
-                      <div key={index} className="h-14 animate-pulse rounded-xl bg-gray-100" />
-                    ))}
-                  </div>
-                ) : !recentBookings.length ? (
-                  <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-                    <CalendarDays className="mx-auto h-10 w-10 text-gray-400" />
-                    <h3 className="mt-4 text-lg font-semibold text-gray-900">No bookings yet</h3>
-                    <p className="mt-2 text-sm text-gray-500">Bookings will appear here immediately</p>
-                  </div>
-                ) : (
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
-                      <tr className="text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
-                        <th className="px-3 py-2">Reference</th>
-                        <th className="px-3 py-2">Name</th>
-                        <th className="px-3 py-2">Bay</th>
-                        <th className="px-3 py-2">Date</th>
-                        <th className="px-3 py-2">Status</th>
-                        <th className="px-3 py-2">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white text-sm text-gray-700">
-                      {recentBookings.slice(0, 10).map((booking) => (
-                        <tr key={booking.id}>
-                          <td className="px-3 py-3 font-semibold text-gray-900">{booking.booking_reference || `BK-${booking.id}`}</td>
-                          <td className="px-3 py-3">{booking.customer_name}</td>
-                          <td className="px-3 py-3">{booking.bay_code || '-'}</td>
-                          <td className="px-3 py-3">{formatDate(booking.booking_date)}</td>
-                          <td className="px-3 py-3">
-                            <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${getStatusBadgeClasses(booking.status)}`}>
-                              {booking.status}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => setViewBooking(booking)}
-                                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100"
-                              >
-                                <Eye className="h-3 w-3" />
-                                View
-                              </button>
-                              <button
-                                onClick={() => handleCancelBooking(booking.id)}
-                                disabled={booking.status === 'cancelled' || loading.cancellingId === booking.id}
-                                className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {loading.cancellingId === booking.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3 w-3" />}
-                                Cancel
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+            ) : loading.bookings && !recentBookings.length ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="h-14 animate-pulse rounded-xl bg-gray-100" />
+                ))}
               </div>
-            </Card>
+            ) : !recentBookings.length ? (
+              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                <CalendarDays className="mx-auto h-10 w-10 text-gray-400" />
+                <h3 className="mt-4 text-lg font-semibold text-gray-900">No bookings yet</h3>
+                <p className="mt-2 text-sm text-gray-500">Bookings will appear here immediately</p>
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr className="text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    <th className="px-4 py-3">Reference</th>
+                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Company</th>
+                    <th className="px-4 py-3">Site</th>
+                    <th className="px-4 py-3">Bay</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Time</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white text-sm text-gray-700">
+                  {recentBookings.slice(0, 15).map((booking) => (
+                    <tr key={booking.id} className="hover:bg-gray-50">
+                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-gray-900">{booking.booking_reference || `BK-${booking.id}`}</td>
+                      <td className="whitespace-nowrap px-4 py-3">{booking.customer_name}</td>
+                      <td className="whitespace-nowrap px-4 py-3">{booking.customer_company || '-'}</td>
+                      <td className="whitespace-nowrap px-4 py-3">{booking.site_name || getSiteName(booking.site_id)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">{booking.bay_code || '-'}</td>
+                      <td className="whitespace-nowrap px-4 py-3">{formatDate(booking.booking_date)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">{formatTime(booking.start_time)} - {formatTime(booking.end_time)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${getStatusBadgeClasses(booking.status)}`}>
+                          {booking.status}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setViewBooking(booking)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                          >
+                            <Eye className="h-3 w-3" />
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleCancelBooking(booking.id)}
+                            disabled={booking.status === 'cancelled' || loading.cancellingId === booking.id}
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {loading.cancellingId === booking.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3 w-3" />}
+                            Cancel
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
-        </div>
+        </Card>
       </div>
 
       {showBookingModal && selectedSpace ? (

@@ -4,7 +4,7 @@ import Card from '../components/Card'
 import Toast from '../components/Toast'
 import axios from '../api/axios'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { Building, Car, AlertTriangle, TrendingUp, CheckCircle, XCircle, Lock } from 'lucide-react'
+import { Building, Car, AlertTriangle, TrendingUp, CheckCircle, XCircle, Lock, RefreshCcw, Ban, Loader2, Eye } from 'lucide-react'
 
 const ManagerDashboard = () => {
   const [sites, setSites] = useState([])
@@ -13,6 +13,8 @@ const ManagerDashboard = () => {
   const [alerts, setAlerts] = useState([])
   const [utilizationData, setUtilizationData] = useState([])
   const [toast, setToast] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [cancellingId, setCancellingId] = useState(null)
 
   useEffect(() => {
     fetchDashboardData()
@@ -39,6 +41,7 @@ const ManagerDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
+      setLoading(true)
       const [sitesRes, utilizationRes, bookingsRes, alertsRes] = await Promise.all([
         axios.get('/api/sites'),
         axios.get('/api/reports/utilization'),
@@ -58,26 +61,9 @@ const ManagerDashboard = () => {
       setSiteStats(statsResults.map(res => res.data))
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
-      // Use demo data if API fails
-      setSites([
-        { id: 1, name: 'Site A - Main Campus', address: '123 Main St' },
-        { id: 2, name: 'Site B - North Building', address: '456 North Ave' },
-        { id: 3, name: 'Site C - South Annex', address: '789 South Rd' }
-      ])
-      setSiteStats([
-        { site_id: 1, site_name: 'Site A - Main Campus', total_spaces: 127, available: 45, occupied: 62, reserved: 15, blocked: 5 },
-        { site_id: 2, site_name: 'Site B - North Building', total_spaces: 103, available: 38, occupied: 50, reserved: 10, blocked: 5 },
-        { site_id: 3, site_name: 'Site C - South Annex', total_spaces: 48, available: 20, occupied: 22, reserved: 4, blocked: 2 }
-      ])
-      setUtilizationData([
-        { site_name: 'Site A', utilization: 65 },
-        { site_name: 'Site B', utilization: 58 },
-        { site_name: 'Site C', utilization: 54 }
-      ])
-      setAlerts([
-        { id: 1, site_name: 'Site A', message: 'High utilization (85%)', severity: 'warning' },
-        { id: 2, site_name: 'Site B', message: '5 spaces blocked for maintenance', severity: 'info' }
-      ])
+      setToast({ message: 'Failed to load dashboard data', type: 'error' })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -111,6 +97,19 @@ const ManagerDashboard = () => {
     }
   }
 
+  const handleCancelBooking = async (bookingId) => {
+    try {
+      setCancellingId(bookingId)
+      await axios.patch(`/api/bookings/${bookingId}/cancel`)
+      setToast({ message: 'Booking cancelled successfully', type: 'success' })
+      fetchDashboardData()
+    } catch (error) {
+      setToast({ message: error.response?.data?.detail || 'Error cancelling booking', type: 'error' })
+    } finally {
+      setCancellingId(null)
+    }
+  }
+
   const totalSpaces = siteStats.reduce((sum, stat) => sum + stat.total_spaces, 0)
   const totalAvailable = siteStats.reduce((sum, stat) => sum + stat.available, 0)
   const totalOccupied = siteStats.reduce((sum, stat) => sum + stat.occupied, 0)
@@ -126,9 +125,19 @@ const ManagerDashboard = () => {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Facilities Manager Dashboard</h1>
-          <p className="text-gray-600 mt-2">Centralized control for all parking sites</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Facilities Manager Dashboard</h1>
+            <p className="text-gray-600 mt-2">Centralized control for all parking sites</p>
+          </div>
+          <button
+            onClick={fetchDashboardData}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+            Refresh
+          </button>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
@@ -267,7 +276,7 @@ const ManagerDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {bookings.slice(0, 10).map(booking => (
+                {bookings.slice(0, 15).map(booking => (
                   <tr key={booking.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-900">{booking.customer_name}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{booking.customer_company || '-'}</td>
@@ -286,24 +295,37 @@ const ManagerDashboard = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {booking.status === 'pending' && (
-                        <div className="flex space-x-2">
+                      <div className="flex space-x-2">
+                        {booking.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleApproveBooking(booking.id)}
+                              className="p-1 text-green-600 hover:bg-green-50 rounded"
+                              title="Approve"
+                            >
+                              <CheckCircle className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleRejectBooking(booking.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded"
+                              title="Reject"
+                            >
+                              <XCircle className="h-5 w-5" />
+                            </button>
+                          </>
+                        )}
+                        {booking.status === 'active' && (
                           <button
-                            onClick={() => handleApproveBooking(booking.id)}
-                            className="p-1 text-green-600 hover:bg-green-50 rounded"
-                            title="Approve"
+                            onClick={() => handleCancelBooking(booking.id)}
+                            disabled={cancellingId === booking.id}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-700 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                            title="Cancel Booking"
                           >
-                            <CheckCircle className="h-5 w-5" />
+                            {cancellingId === booking.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3 w-3" />}
+                            Cancel
                           </button>
-                          <button
-                            onClick={() => handleRejectBooking(booking.id)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded"
-                            title="Reject"
-                          >
-                            <XCircle className="h-5 w-5" />
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

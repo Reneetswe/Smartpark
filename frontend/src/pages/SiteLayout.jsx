@@ -1,38 +1,48 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import Card from '../components/Card'
 import Toast from '../components/Toast'
 import axios from '../api/axios'
-import { MapPinned, CarFront, Building2, RefreshCcw, ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
+import { MapPinned, CarFront, Building2, RefreshCcw, ArrowLeft, Loader2, AlertCircle, X, Calendar, Clock } from 'lucide-react'
 
 const SiteLayout = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  const filterSiteId = searchParams.get('site_id')
+  const filterCategory = searchParams.get('category')
+  const filterDate = searchParams.get('booking_date') || new Date().toISOString().split('T')[0]
+  const filterStartTime = searchParams.get('start_time') || '08:00'
+  const filterEndTime = searchParams.get('end_time') || '17:00'
+
   const [sites, setSites] = useState([])
-  const [selectedSite, setSelectedSite] = useState('')
-  const [layoutSpaces, setLayoutSpaces] = useState([])
-  const [loading, setLoading] = useState({ sites: false, layout: false })
+  const [allSpaces, setAllSpaces] = useState([])
+  const [selectedSpace, setSelectedSpace] = useState(null)
+  const [showBookingModal, setShowBookingModal] = useState(false)
+  const [bookingForm, setBookingForm] = useState({
+    customer_name: '',
+    customer_email: '',
+    customer_phone: '',
+    customer_company: '',
+    booking_date: filterDate,
+    start_time: filterStartTime,
+    end_time: filterEndTime
+  })
+  const [loading, setLoading] = useState({ sites: false, spaces: false, booking: false })
   const [error, setError] = useState('')
   const [toast, setToast] = useState(null)
 
   useEffect(() => {
     fetchSites()
+    fetchAllSpaces()
   }, [])
-
-  useEffect(() => {
-    if (selectedSite) {
-      fetchLayoutSpaces(selectedSite)
-    }
-  }, [selectedSite])
 
   const fetchSites = async () => {
     try {
       setLoading(prev => ({ ...prev, sites: true }))
       const response = await axios.get('/api/sites')
       setSites(response.data)
-      if (response.data.length > 0) {
-        setSelectedSite(response.data[0].id)
-      }
     } catch (err) {
       setError('Failed to load sites')
       setToast({ message: 'Failed to load sites', type: 'error' })
@@ -41,64 +51,123 @@ const SiteLayout = () => {
     }
   }
 
-  const fetchLayoutSpaces = async (siteId) => {
+  const fetchAllSpaces = async () => {
     try {
-      setLoading(prev => ({ ...prev, layout: true }))
+      setLoading(prev => ({ ...prev, spaces: true }))
       setError('')
-      const response = await axios.get(`/api/spaces?site_id=${siteId}`)
-      setLayoutSpaces(response.data)
+      const response = await axios.get('/api/spaces')
+      setAllSpaces(response.data)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load layout')
-      setToast({ message: 'Failed to load site layout', type: 'error' })
+      setError(err.response?.data?.detail || 'Failed to load parking spaces')
+      setToast({ message: 'Failed to load parking spaces', type: 'error' })
     } finally {
-      setLoading(prev => ({ ...prev, layout: false }))
+      setLoading(prev => ({ ...prev, spaces: false }))
     }
   }
 
-  const getLayoutClasses = (space) => {
+  const handleSpaceClick = (space) => {
+    if (space.status === 'available' && space.is_active) {
+      setSelectedSpace(space)
+      setShowBookingModal(true)
+    }
+  }
+
+  const handleCloseModal = () => {
+    setShowBookingModal(false)
+    setSelectedSpace(null)
+    setBookingForm({
+      customer_name: '',
+      customer_email: '',
+      customer_phone: '',
+      customer_company: '',
+      booking_date: new Date().toISOString().split('T')[0],
+      start_time: '08:00',
+      end_time: '17:00'
+    })
+  }
+
+  const handleBooking = async (e) => {
+    e.preventDefault()
+    if (!selectedSpace) return
+
+    try {
+      setLoading(prev => ({ ...prev, booking: true }))
+      await axios.post('/api/bookings', {
+        ...bookingForm,
+        site_id: selectedSpace.site_id,
+        space_id: selectedSpace.id,
+        booking_type: selectedSpace.category
+      })
+      setToast({ message: 'Booking created successfully!', type: 'success' })
+      handleCloseModal()
+      fetchAllSpaces()
+    } catch (err) {
+      setToast({ message: err.response?.data?.detail || 'Failed to create booking', type: 'error' })
+    } finally {
+      setLoading(prev => ({ ...prev, booking: false }))
+    }
+  }
+
+  const getSpaceClasses = (space) => {
     if (!space.is_active || ['blocked', 'maintenance'].includes(space.status)) {
-      return 'bg-slate-200 text-slate-600 border-slate-300'
+      return 'bg-gray-300 text-gray-600 cursor-not-allowed'
     }
-
-    if (space.category === 'ev') {
-      return 'bg-blue-100 text-blue-700 border-blue-200'
-    }
-
-    if (space.category === 'disabled') {
-      return 'bg-yellow-100 text-yellow-700 border-yellow-200'
-    }
-
-    if (space.category === 'visitor') {
-      return 'bg-purple-100 text-purple-700 border-purple-200'
-    }
-
     if (['occupied', 'reserved'].includes(space.status)) {
-      return 'bg-red-100 text-red-700 border-red-200'
+      return 'bg-gray-400 text-gray-700 cursor-not-allowed'
     }
-
-    return 'bg-emerald-100 text-emerald-700 border-emerald-200'
+    return 'bg-white text-gray-900 hover:bg-green-50 cursor-pointer border-green-200'
   }
 
-  const getCategoryLabel = (category) => {
-    const labels = {
+  const groupSpacesForSite = (siteId) => {
+    let siteSpaces = allSpaces
+      .filter(s => s.site_id === siteId)
+      .sort((a, b) => (a.bay_code || '').localeCompare(b.bay_code || '', undefined, { numeric: true }))
+
+    if (filterCategory) {
+      siteSpaces = siteSpaces.filter(s => s.category === filterCategory)
+    }
+
+    const byCategory = {}
+    const categoryLabels = {
+      ev: 'EV Charging',
       standard: 'Standard',
-      ev: 'Electric',
       disabled: 'Disabled',
       visitor: 'Visitor'
     }
-    return labels[category] || category
-  }
 
-  const getSiteName = (siteId) => {
-    const site = sites.find(s => s.id === parseInt(siteId))
-    return site?.name || 'Unknown Site'
+    siteSpaces.forEach(space => {
+      const cat = space.category || 'standard'
+      if (!byCategory[cat]) byCategory[cat] = []
+      byCategory[cat].push(space)
+    })
+
+    const blocks = []
+    const BLOCK_SIZE = 20
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    let letterIdx = 0
+
+    Object.entries(byCategory).forEach(([cat, spaces]) => {
+      for (let i = 0; i < spaces.length; i += BLOCK_SIZE) {
+        const chunk = spaces.slice(i, i + BLOCK_SIZE)
+        const label = letters[letterIdx % 26]
+        blocks.push({
+          key: `${cat}-${i}`,
+          label: `${label} BLOCK`,
+          subtitle: categoryLabels[cat] || cat,
+          spaces: chunk
+        })
+        letterIdx++
+      }
+    })
+
+    return blocks
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -109,154 +178,212 @@ const SiteLayout = () => {
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Site Layout</h1>
-              <p className="mt-1 text-sm text-gray-600">Visual overview of parking spaces by site</p>
+              <h1 className="text-2xl font-bold text-gray-900">Parking Lot</h1>
+              <p className="mt-1 text-sm text-gray-600">Click on available parking to book</p>
             </div>
           </div>
 
           <button
-            onClick={() => fetchLayoutSpaces(selectedSite)}
-            disabled={loading.layout}
+            onClick={fetchAllSpaces}
+            disabled={loading.spaces}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
           >
-            {loading.layout ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+            {loading.spaces ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
             Refresh
           </button>
         </div>
 
-        {/* Site Selector */}
-        <Card className="mb-6 p-4">
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700">Select Site:</label>
-            <select
-              value={selectedSite}
-              onChange={(e) => setSelectedSite(e.target.value)}
-              disabled={loading.sites}
-              className="flex-1 max-w-md rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
-            >
-              {loading.sites ? (
-                <option>Loading sites...</option>
-              ) : (
-                sites.map(site => (
-                  <option key={site.id} value={site.id}>{site.name}</option>
-                ))
-              )}
-            </select>
-          </div>
-        </Card>
-
-        {/* Legend */}
-        <Card className="mb-6 p-4">
-          <div className="flex flex-wrap gap-3 text-xs font-medium text-gray-600">
-            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Available
+        {/* Filter indicator + Legend */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4 text-sm">
+            <span className="flex items-center gap-2">
+              <span className="h-4 w-4 rounded border border-gray-400 bg-gray-400"></span>
+              <span className="text-gray-700">Occupied</span>
             </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Occupied
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-slate-500" /> Unavailable
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Electric
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-yellow-50 px-3 py-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" /> Disabled
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-purple-50 px-3 py-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-purple-500" /> Visitor
+            <span className="flex items-center gap-2">
+              <span className="h-4 w-4 rounded border border-gray-300 bg-white"></span>
+              <span className="text-gray-700">Vacant</span>
             </span>
           </div>
-        </Card>
-
-        {/* Layout Display */}
-        <Card className="p-6">
-          {error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 h-5 w-5" />
-                <div>
-                  <p className="font-semibold">Unable to load site layout</p>
-                  <p className="mt-1">{error}</p>
-                </div>
-              </div>
+          {filterSiteId && (
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">
+              <span>Filtered: {sites.find(s => s.id === parseInt(filterSiteId))?.name || 'Site'}</span>
+              {filterCategory && <span>| {filterCategory}</span>}
+              <span>| {filterDate}</span>
+              <span>| {filterStartTime} - {filterEndTime}</span>
+              <button onClick={() => navigate('/reception/layout')} className="ml-1 rounded-full p-0.5 hover:bg-blue-100">
+                <X className="h-3 w-3" />
+              </button>
             </div>
-          ) : loading.layout ? (
+          )}
+        </div>
+
+        {/* All Sites Layout */}
+        <div className="space-y-8">
+          {loading.spaces ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
             </div>
-          ) : !layoutSpaces.length ? (
-            <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-              <MapPinned className="mx-auto h-10 w-10 text-gray-400" />
-              <h3 className="mt-4 text-lg font-semibold text-gray-900">No parking spaces found</h3>
-              <p className="mt-2 text-sm text-gray-500">The selected site does not have any parking spaces configured.</p>
+          ) : error ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+              <AlertCircle className="h-5 w-5" />
+              <p className="font-semibold">Unable to load parking spaces</p>
+              <p className="mt-1">{error}</p>
             </div>
           ) : (
-            <div className="rounded-2xl border border-gray-200 bg-gradient-to-b from-gray-50 to-white p-6">
-              {/* Entry */}
-              <div className="mb-4 text-center">
-                <div className="inline-block rounded-lg bg-emerald-500 px-6 py-2 text-sm font-bold uppercase tracking-wider text-white shadow-md">
-                  Entry
-                </div>
-              </div>
+            (filterSiteId ? sites.filter(s => s.id === parseInt(filterSiteId)) : sites).map(site => {
+              const blocks = groupSpacesForSite(site.id)
+              
+              if (!blocks.length) return null
 
-              {/* Parking Lot Layout */}
-              <div className="relative mx-auto max-w-4xl">
-                <div className="grid grid-cols-[1fr_80px_1fr] gap-4">
-                  {/* Left Side Parking */}
-                  <div className="space-y-3">
-                    {layoutSpaces.filter((_, idx) => idx % 2 === 0).map((space) => (
-                      <div
-                        key={space.id}
-                        className={`flex items-center justify-between rounded-lg border-2 px-4 py-3 shadow-sm transition-all hover:shadow-md ${getLayoutClasses(space)}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <CarFront className="h-4 w-4" />
-                          <span className="text-sm font-bold">{space.bay_code}</span>
+              return (
+                <Card key={site.id} className="p-6">
+                  <h2 className="mb-4 text-lg font-bold text-gray-900">{site.name}</h2>
+                  
+                  <div className="overflow-x-auto pb-2">
+                    <div className="flex gap-4" style={{ minWidth: 'max-content' }}>
+                      {blocks.map(block => (
+                        <div key={block.key} className="flex-shrink-0 rounded-lg border border-gray-200 bg-white p-4" style={{ width: '180px' }}>
+                          <h4 className="text-center text-sm font-bold text-gray-900">{block.label}</h4>
+                          <p className="mb-3 text-center text-xs text-gray-500">{block.subtitle}</p>
+                          
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {block.spaces.map(space => (
+                              <button
+                                key={space.id}
+                                onClick={() => handleSpaceClick(space)}
+                                disabled={space.status !== 'available' || !space.is_active}
+                                className={`rounded border px-1 py-1.5 text-[10px] font-semibold transition-colors ${getSpaceClasses(space)}`}
+                              >
+                                {space.bay_code}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <span className="text-xs font-medium uppercase">{space.category}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Central Driveway */}
-                  <div className="relative flex flex-col items-center justify-center">
-                    <div className="absolute inset-0 border-x-4 border-dashed border-blue-300 bg-blue-50/30"></div>
-                    <div className="relative z-10 flex h-full flex-col items-center justify-center">
-                      <div className="rounded-full bg-blue-500 p-3 shadow-lg">
-                        <MapPinned className="h-6 w-6 text-white" />
-                      </div>
+                      ))}
                     </div>
                   </div>
-
-                  {/* Right Side Parking */}
-                  <div className="space-y-3">
-                    {layoutSpaces.filter((_, idx) => idx % 2 === 1).map((space) => (
-                      <div
-                        key={space.id}
-                        className={`flex items-center justify-between rounded-lg border-2 px-4 py-3 shadow-sm transition-all hover:shadow-md ${getLayoutClasses(space)}`}
-                      >
-                        <span className="text-xs font-medium uppercase">{space.category}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold">{space.bay_code}</span>
-                          <CarFront className="h-4 w-4" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Exit */}
-              <div className="mt-4 text-center">
-                <div className="inline-block rounded-lg bg-rose-500 px-6 py-2 text-sm font-bold uppercase tracking-wider text-white shadow-md">
-                  Exit
-                </div>
-              </div>
-            </div>
+                </Card>
+              )
+            })
           )}
-        </Card>
+        </div>
       </div>
+
+      {/* Booking Modal */}
+      {showBookingModal && selectedSpace && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 p-4">
+              <h3 className="text-lg font-bold text-gray-900">Book Parking Space</h3>
+              <button onClick={handleCloseModal} className="rounded-full p-1 hover:bg-gray-100">
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleBooking} className="p-4 space-y-4">
+              <div className="rounded-lg bg-blue-50 p-3">
+                <p className="text-sm font-semibold text-blue-900">Space: {selectedSpace.bay_code}</p>
+                <p className="text-xs text-blue-700">Site: {sites.find(s => s.id === selectedSpace.site_id)?.name}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
+                <input
+                  type="text"
+                  required
+                  value={bookingForm.customer_name}
+                  onChange={(e) => setBookingForm({...bookingForm, customer_name: e.target.value})}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={bookingForm.customer_email}
+                  onChange={(e) => setBookingForm({...bookingForm, customer_email: e.target.value})}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  required
+                  value={bookingForm.customer_phone}
+                  onChange={(e) => setBookingForm({...bookingForm, customer_phone: e.target.value})}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company (Optional)</label>
+                <input
+                  type="text"
+                  value={bookingForm.customer_company}
+                  onChange={(e) => setBookingForm({...bookingForm, customer_company: e.target.value})}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={bookingForm.booking_date}
+                    onChange={(e) => setBookingForm({...bookingForm, booking_date: e.target.value})}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                  <input
+                    type="time"
+                    required
+                    value={bookingForm.start_time}
+                    onChange={(e) => setBookingForm({...bookingForm, start_time: e.target.value})}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                <input
+                  type="time"
+                  required
+                  value={bookingForm.end_time}
+                  onChange={(e) => setBookingForm({...bookingForm, end_time: e.target.value})}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading.booking}
+                  className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loading.booking ? 'Booking...' : 'Book Now'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>

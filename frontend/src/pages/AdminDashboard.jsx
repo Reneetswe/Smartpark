@@ -3,7 +3,7 @@ import Navbar from '../components/Navbar'
 import Card from '../components/Card'
 import Toast from '../components/Toast'
 import axios from '../api/axios'
-import { Users, Activity, Shield, AlertCircle, UserPlus, Edit, UserX, UserCheck, X } from 'lucide-react'
+import { Users, Activity, Shield, AlertCircle, UserPlus, Edit, UserX, UserCheck, X, Building, Car, CalendarDays, Ban, RefreshCcw, Loader2 } from 'lucide-react'
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([])
@@ -15,7 +15,10 @@ const AdminDashboard = () => {
     inactiveUsers: 0,
     recentActions: 0
   })
+  const [siteStats, setSiteStats] = useState([])
+  const [bookings, setBookings] = useState([])
   const [toast, setToast] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [showUserModal, setShowUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [formData, setFormData] = useState({
@@ -35,13 +38,17 @@ const AdminDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [usersRes, logsRes] = await Promise.all([
+      setLoading(true)
+      const [usersRes, logsRes, sitesRes, bookingsRes] = await Promise.all([
         axios.get('/api/users'),
-        axios.get('/api/logs?limit=50')
+        axios.get('/api/logs?limit=50'),
+        axios.get('/api/sites'),
+        axios.get('/api/bookings')
       ])
 
       setUsers(usersRes.data)
       setActivityLogs(logsRes.data)
+      setBookings(bookingsRes.data)
 
       const activeUsers = usersRes.data.filter(u => u.is_active).length
       setStats({
@@ -50,6 +57,12 @@ const AdminDashboard = () => {
         inactiveUsers: usersRes.data.length - activeUsers,
         recentActions: logsRes.data.length
       })
+
+      const statsPromises = sitesRes.data.map(site =>
+        axios.get(`/api/sites/${site.id}/stats`)
+      )
+      const statsResults = await Promise.all(statsPromises)
+      setSiteStats(statsResults.map(res => res.data))
 
       const rolesData = [
         { id: 1, name: 'receptionist' },
@@ -63,6 +76,8 @@ const AdminDashboard = () => {
         message: 'Failed to load dashboard data. Please check API connection.', 
         type: 'error' 
       })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -168,19 +183,29 @@ const AdminDashboard = () => {
         <div className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">IT Admin Dashboard</h1>
-            <p className="text-gray-600 mt-2">System administration and user management</p>
+            <p className="text-gray-600 mt-2">System administration and full system tracking</p>
           </div>
-          <button
-            onClick={() => {
-              setEditingUser(null)
-              resetForm()
-              setShowUserModal(true)
-            }}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center"
-          >
-            <UserPlus className="h-5 w-5 mr-2" />
-            Add User
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={fetchDashboardData}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+              Refresh
+            </button>
+            <button
+              onClick={() => {
+                setEditingUser(null)
+                resetForm()
+                setShowUserModal(true)
+              }}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center"
+            >
+              <UserPlus className="h-5 w-5 mr-2" />
+              Add User
+            </button>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-4 gap-6 mb-8">
@@ -207,10 +232,10 @@ const AdminDashboard = () => {
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Inactive Users</p>
-                <p className="text-3xl font-bold text-red-600">{stats.inactiveUsers}</p>
+                <p className="text-sm text-gray-600 mb-1">Total Bookings</p>
+                <p className="text-3xl font-bold text-blue-600">{bookings.length}</p>
               </div>
-              <UserX className="h-10 w-10 text-red-600" />
+              <CalendarDays className="h-10 w-10 text-blue-600" />
             </div>
           </Card>
 
@@ -218,12 +243,57 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Recent Actions</p>
-                <p className="text-3xl font-bold text-blue-600">{stats.recentActions}</p>
+                <p className="text-3xl font-bold text-purple-600">{stats.recentActions}</p>
               </div>
-              <Activity className="h-10 w-10 text-blue-600" />
+              <Activity className="h-10 w-10 text-purple-600" />
             </div>
           </Card>
         </div>
+
+        {siteStats.length > 0 && (
+          <Card className="p-6 mb-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+              <Building className="h-5 w-5 mr-2 text-blue-600" />
+              Parking Sites Overview
+            </h2>
+            <div className="grid md:grid-cols-3 gap-4">
+              {siteStats.map(stat => (
+                <div key={stat.site_id} className="rounded-lg border border-gray-200 p-4">
+                  <h3 className="font-semibold text-gray-900 mb-3">{stat.site_name}</h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="rounded bg-gray-50 p-2">
+                      <p className="text-gray-500">Total</p>
+                      <p className="font-bold text-gray-900">{stat.total_spaces}</p>
+                    </div>
+                    <div className="rounded bg-green-50 p-2">
+                      <p className="text-green-600">Available</p>
+                      <p className="font-bold text-green-700">{stat.available}</p>
+                    </div>
+                    <div className="rounded bg-blue-50 p-2">
+                      <p className="text-blue-600">Occupied</p>
+                      <p className="font-bold text-blue-700">{stat.occupied}</p>
+                    </div>
+                    <div className="rounded bg-yellow-50 p-2">
+                      <p className="text-yellow-600">Reserved</p>
+                      <p className="font-bold text-yellow-700">{stat.reserved}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all"
+                        style={{ width: `${stat.total_spaces ? ((stat.occupied + stat.reserved) / stat.total_spaces) * 100 : 0}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {stat.total_spaces ? Math.round(((stat.occupied + stat.reserved) / stat.total_spaces) * 100) : 0}% utilized
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
@@ -314,14 +384,7 @@ const AdminDashboard = () => {
                       <p className="text-sm font-medium text-gray-900">{log.action}</p>
                       <p className="text-xs text-gray-600">{log.user_name}</p>
                       <p className="text-xs text-gray-500">
-                        {new Date(log.created_at).toLocaleString('en-GB', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit'
-                        })}
+                        {log.created_at?.replace('T', ' ').split('.')[0]}
                       </p>
                     </div>
                   ))
@@ -335,6 +398,53 @@ const AdminDashboard = () => {
             </Card>
           </div>
         </div>
+
+        {bookings.length > 0 && (
+          <Card className="p-6 mt-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+              <CalendarDays className="h-5 w-5 mr-2 text-blue-600" />
+              Recent Bookings
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Reference</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Customer</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Site</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Bay</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Time</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase">Created By</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {bookings.slice(0, 20).map(booking => (
+                    <tr key={booking.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">{booking.booking_reference || `BK-${booking.id}`}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{booking.customer_name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{booking.site_name || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{booking.bay_code || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{booking.booking_date}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{booking.start_time} - {booking.end_time}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          booking.status === 'active' ? 'bg-green-100 text-green-700' :
+                          booking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {booking.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{booking.created_by || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
       </div>
 
       {showUserModal && (

@@ -133,6 +133,7 @@ def create_booking(
         status="active"
     )
     
+    space.status = "reserved"
     db.add(new_booking)
     db.commit()
     db.refresh(new_booking)
@@ -184,6 +185,15 @@ def cancel_booking(
         raise HTTPException(status_code=404, detail="Booking not found")
     
     booking.status = "cancelled"
+    space = db.query(ParkingSpace).filter(ParkingSpace.id == booking.space_id).first()
+    if space:
+        active_bookings = db.query(Booking).filter(
+            Booking.space_id == booking.space_id,
+            Booking.id != booking.id,
+            Booking.status == "active"
+        ).count()
+        if active_bookings == 0:
+            space.status = "available"
     db.commit()
     
     log_activity(db, current_user.id, f"Cancelled booking {booking_id}", "booking", booking.id)
@@ -202,6 +212,9 @@ def approve_booking(
     
     booking.status = "active"
     booking.approved_by = current_user.id
+    space = db.query(ParkingSpace).filter(ParkingSpace.id == booking.space_id).first()
+    if space:
+        space.status = "reserved"
     db.commit()
     
     log_activity(db, current_user.id, f"Approved booking {booking_id}", "booking", booking.id)
@@ -219,6 +232,15 @@ def reject_booking(
         raise HTTPException(status_code=404, detail="Booking not found")
     
     booking.status = "rejected"
+    space = db.query(ParkingSpace).filter(ParkingSpace.id == booking.space_id).first()
+    if space:
+        active_bookings = db.query(Booking).filter(
+            Booking.space_id == booking.space_id,
+            Booking.id != booking.id,
+            Booking.status == "active"
+        ).count()
+        if active_bookings == 0:
+            space.status = "available"
     db.commit()
     
     log_activity(db, current_user.id, f"Rejected booking {booking_id}", "booking", booking.id)
@@ -236,6 +258,15 @@ def override_booking(
         raise HTTPException(status_code=404, detail="Booking not found")
     
     booking.status = "cancelled"
+    space = db.query(ParkingSpace).filter(ParkingSpace.id == booking.space_id).first()
+    if space:
+        active_bookings = db.query(Booking).filter(
+            Booking.space_id == booking.space_id,
+            Booking.id != booking.id,
+            Booking.status == "active"
+        ).count()
+        if active_bookings == 0:
+            space.status = "available"
     db.commit()
     
     log_activity(db, current_user.id, f"Overrode booking {booking_id}", "booking", booking.id)
