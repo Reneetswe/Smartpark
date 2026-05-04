@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class ParkingCategoryBase(BaseModel):
     name: str
@@ -8,8 +9,8 @@ class ParkingCategoryCreate(ParkingCategoryBase):
     pass
 
 class ParkingCategoryUpdate(BaseModel):
-    name: str | None = None
-    color_code: str | None = None
+    name: Optional[str] = None
+    color_code: Optional[str] = None
 
 class ParkingCategoryResponse(ParkingCategoryBase):
     id: int

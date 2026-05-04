@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 from app.database import get_db
 from app.models.user import User
@@ -16,8 +16,8 @@ class SpacePositionUpdate(BaseModel):
     pos_y: int
 
 class SpaceUpdate(BaseModel):
-    category_id: int | None = None
-    status: str | None = None
+    category_id: Optional[int] = None
+    status: Optional[str] = None
 
 class BulkPositionUpdate(BaseModel):
     updates: List[SpacePositionUpdate]
