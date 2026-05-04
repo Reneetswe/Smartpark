@@ -1,9 +1,9 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str = Field(..., pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
     password: str
 
 class Token(BaseModel):
@@ -13,7 +13,7 @@ class Token(BaseModel):
 
 class UserCreate(BaseModel):
     full_name: str
-    email: EmailStr
+    email: str = Field(..., pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
     password: str
     role_id: int
     employee_number: Optional[str] = None
@@ -23,7 +23,7 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = Field(None, pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
     role_id: Optional[int] = None
     employee_number: Optional[str] = None
     contact_number: Optional[str] = None
