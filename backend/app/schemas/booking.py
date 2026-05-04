@@ -20,6 +20,13 @@ class BookingUpdate(BaseModel):
     start_time: Optional[time] = None
     end_time: Optional[time] = None
 
+class BookingOverride(BaseModel):
+    action: str  # "cancel", "reassign", "modify_time"
+    reason: str
+    new_space_id: Optional[int] = None
+    new_start_time: Optional[time] = None
+    new_end_time: Optional[time] = None
+
 class BookingResponse(BaseModel):
     id: int
     customer_name: str
@@ -40,6 +47,10 @@ class BookingResponse(BaseModel):
     booking_reference: Optional[str] = None
     site_name: Optional[str] = None
     bay_code: Optional[str] = None
+    overridden: Optional[bool] = False
+    override_reason: Optional[str] = None
+    overridden_by: Optional[int] = None
+    overridden_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

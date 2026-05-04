@@ -3,7 +3,7 @@ import Navbar from '../components/Navbar'
 import Card from '../components/Card'
 import Toast from '../components/Toast'
 import axios from '../api/axios'
-import { Users, Activity, Shield, AlertCircle, UserPlus, Edit, UserX, UserCheck, X, Building, Car, CalendarDays, Ban, RefreshCcw, Loader2 } from 'lucide-react'
+import { Users, Activity, Shield, AlertCircle, Edit, UserX, UserCheck, X, Building, Car, CalendarDays, Ban, RefreshCcw, Loader2 } from 'lucide-react'
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([])
@@ -19,8 +19,8 @@ const AdminDashboard = () => {
   const [bookings, setBookings] = useState([])
   const [toast, setToast] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showUserModal, setShowUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -91,7 +91,7 @@ const AdminDashboard = () => {
       })
       
       setToast({ message: 'User created successfully!', type: 'success' })
-      setShowUserModal(false)
+      setShowEditModal(false)
       resetForm()
       fetchDashboardData()
     } catch (error) {
@@ -112,7 +112,7 @@ const AdminDashboard = () => {
       await axios.put(`/api/users/${editingUser.id}`, updateData)
       
       setToast({ message: 'User updated successfully!', type: 'success' })
-      setShowUserModal(false)
+      setShowEditModal(false)
       setEditingUser(null)
       resetForm()
       fetchDashboardData()
@@ -157,7 +157,7 @@ const AdminDashboard = () => {
       company: user.company || 'RoppaCorp Industries',
       is_priority: user.is_priority
     })
-    setShowUserModal(true)
+    setShowEditModal(true)
   }
 
   const resetForm = () => {
@@ -194,17 +194,7 @@ const AdminDashboard = () => {
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
               Refresh
             </button>
-            <button
-              onClick={() => {
-                setEditingUser(null)
-                resetForm()
-                setShowUserModal(true)
-              }}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center"
-            >
-              <UserPlus className="h-5 w-5 mr-2" />
-              Add User
-            </button>
+            {/* Add User button removed */}
           </div>
         </div>
 
@@ -447,15 +437,15 @@ const AdminDashboard = () => {
         )}
       </div>
 
-      {showUserModal && (
+      {showEditModal && editingUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-gray-900">
-                {editingUser ? 'Edit User' : 'Create New User'}
+                Edit User
               </h3>
               <button onClick={() => {
-                setShowUserModal(false)
+                setShowEditModal(false)
                 setEditingUser(null)
                 resetForm()
               }} className="text-gray-500 hover:text-gray-700">
@@ -562,7 +552,7 @@ const AdminDashboard = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    setShowUserModal(false)
+                    setShowEditModal(false)
                     setEditingUser(null)
                     resetForm()
                   }}

@@ -9,6 +9,7 @@ class ParkingSpace(Base):
     site_id = Column(Integer, ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
     bay_code = Column(String(20), nullable=False)
     category = Column(String(30), nullable=False)
+    category_id = Column(Integer, ForeignKey("parking_categories.id"), nullable=True)
     status = Column(String(30), nullable=False, default="available")
     is_priority_only = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
@@ -18,6 +19,7 @@ class ParkingSpace(Base):
     __table_args__ = (UniqueConstraint('site_id', 'bay_code', name='_site_bay_uc'),)
     
     site = relationship("Site", back_populates="parking_spaces")
+    category_rel = relationship("ParkingCategory", back_populates="parking_spaces")
     bookings = relationship("Booking", back_populates="space")
     visitor_bookings = relationship("VisitorBooking", back_populates="space")
     maintenance_blocks = relationship("MaintenanceBlock", back_populates="space")

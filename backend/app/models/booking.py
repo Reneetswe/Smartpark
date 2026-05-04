@@ -26,10 +26,17 @@ class Booking(Base):
     created_by = Column(Integer, ForeignKey("users.id"))
     approved_by = Column(Integer, ForeignKey("users.id"))
     
+    # Override tracking
+    overridden = Column(Boolean, default=False)
+    override_reason = Column(String(500))
+    overridden_by = Column(Integer, ForeignKey("users.id"))
+    overridden_at = Column(DateTime(timezone=True))
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
     creator = relationship("User", foreign_keys=[created_by])
     approver = relationship("User", foreign_keys=[approved_by])
+    overrider = relationship("User", foreign_keys=[overridden_by])
     site = relationship("Site", back_populates="bookings")
     space = relationship("ParkingSpace", back_populates="bookings")

@@ -4,7 +4,7 @@ import Card from '../components/Card'
 import Toast from '../components/Toast'
 import axios from '../api/axios'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { Building, Car, AlertTriangle, TrendingUp, CheckCircle, XCircle, Lock, RefreshCcw, Ban, Loader2, Eye } from 'lucide-react'
+import { Building, Car, AlertTriangle, TrendingUp, CheckCircle, XCircle, RefreshCcw, Ban, Loader2, Eye, AlertCircle, Clock, MapPin, X } from 'lucide-react'
 
 const ManagerDashboard = () => {
   const [sites, setSites] = useState([])
@@ -15,6 +15,10 @@ const ManagerDashboard = () => {
   const [toast, setToast] = useState(null)
   const [loading, setLoading] = useState(true)
   const [cancellingId, setCancellingId] = useState(null)
+  const [overrideModal, setOverrideModal] = useState({ show: false, booking: null })
+  const [overrideForm, setOverrideForm] = useState({ action: 'cancel', reason: '', new_space_id: '', new_start_time: '', new_end_time: '' })
+  const [availableSpaces, setAvailableSpaces] = useState([])
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     fetchDashboardData()
@@ -87,13 +91,50 @@ const ManagerDashboard = () => {
     }
   }
 
-  const handleBlockSpace = async (spaceId) => {
+  const handleOpenOverride = (booking) => {
+    setOverrideModal({ show: true, booking })
+    setOverrideForm({ action: 'cancel', reason: '', new_space_id: '', new_start_time: booking.start_time, new_end_time: booking.end_time })
+    if (booking.site_id) {
+      fetchAvailableSpaces(booking.site_id)
+    }
+  }
+
+  const fetchAvailableSpaces = async (siteId) => {
     try {
-      await axios.patch(`/api/spaces/${spaceId}/block`)
-      setToast({ message: 'Space blocked successfully', type: 'success' })
+      const response = await axios.get(`/api/spaces?site_id=${siteId}`)
+      setAvailableSpaces(response.data.filter(s => s.status === 'available'))
+    } catch (error) {
+      console.error('Failed to fetch available spaces:', error)
+    }
+  }
+
+  const handleCloseOverride = () => {
+    setOverrideModal({ show: false, booking: null })
+    setOverrideForm({ action: 'cancel', reason: '', new_space_id: '', new_start_time: '', new_end_time: '' })
+  }
+
+  const handleSubmitOverride = async () => {
+    if (!overrideForm.reason.trim()) {
+      setToast({ message: 'Please provide a reason for override', type: 'error' })
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      await axios.post(`/api/bookings/${overrideModal.booking.id}/override`, {
+        action: overrideForm.action,
+        reason: overrideForm.reason,
+        new_space_id: overrideForm.new_space_id ? parseInt(overrideForm.new_space_id) : null,
+        new_start_time: overrideForm.new_start_time || null,
+        new_end_time: overrideForm.new_end_time || null
+      })
+      setToast({ message: 'Booking overridden successfully', type: 'success' })
+      handleCloseOverride()
       fetchDashboardData()
     } catch (error) {
-      setToast({ message: 'Error blocking space', type: 'error' })
+      setToast({ message: error.response?.data?.detail || 'Failed to override booking', type: 'error' })
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -114,7 +155,6 @@ const ManagerDashboard = () => {
   const totalAvailable = siteStats.reduce((sum, stat) => sum + stat.available, 0)
   const totalOccupied = siteStats.reduce((sum, stat) => sum + stat.occupied, 0)
   const totalReserved = siteStats.reduce((sum, stat) => sum + stat.reserved, 0)
-  const totalBlocked = siteStats.reduce((sum, stat) => sum + stat.blocked, 0)
 
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#6B7280']
 
@@ -180,16 +220,6 @@ const ManagerDashboard = () => {
               <Car className="h-10 w-10 text-yellow-600" />
             </div>
           </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Blocked</p>
-                <p className="text-3xl font-bold text-red-600">{totalBlocked}</p>
-              </div>
-              <Lock className="h-10 w-10 text-red-600" />
-            </div>
-          </Card>
         </div>
 
         {alerts.length > 0 && (
@@ -225,7 +255,6 @@ const ManagerDashboard = () => {
                 <Bar dataKey="available" fill="#10B981" name="Available" />
                 <Bar dataKey="occupied" fill="#3B82F6" name="Occupied" />
                 <Bar dataKey="reserved" fill="#F59E0B" name="Reserved" />
-                <Bar dataKey="blocked" fill="#EF4444" name="Blocked" />
               </BarChart>
             </ResponsiveContainer>
           </Card>
@@ -281,18 +310,25 @@ const ManagerDashboard = () => {
                     <td className="px-4 py-3 text-sm text-gray-900">{booking.customer_name}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{booking.customer_company || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-900">{booking.site_name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{booking.bay_code}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{booking.booking_date}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{booking.start_time}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        booking.status === 'active' ? 'bg-green-100 text-green-700' :
-                        booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                        booking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {booking.status}
-                      </span>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{booking.bay_code || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{booking.booking_date}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{booking.start_time} - {booking.end_time}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          booking.status === 'active' ? 'bg-green-100 text-green-800' :
+                          booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {booking.status}
+                        </span>
+                        {booking.overridden && (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800" title={booking.override_reason}>
+                            Overridden
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex space-x-2">
@@ -315,15 +351,25 @@ const ManagerDashboard = () => {
                           </>
                         )}
                         {booking.status === 'active' && (
-                          <button
-                            onClick={() => handleCancelBooking(booking.id)}
-                            disabled={cancellingId === booking.id}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-700 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50"
-                            title="Cancel Booking"
-                          >
-                            {cancellingId === booking.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3 w-3" />}
-                            Cancel
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleOpenOverride(booking)}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-50"
+                              title="Override Booking"
+                            >
+                              <AlertCircle className="h-3 w-3" />
+                              Override
+                            </button>
+                            <button
+                              onClick={() => handleCancelBooking(booking.id)}
+                              disabled={cancellingId === booking.id}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-700 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                              title="Cancel Booking"
+                            >
+                              {cancellingId === booking.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3 w-3" />}
+                              Cancel
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -334,6 +380,109 @@ const ManagerDashboard = () => {
           </div>
         </Card>
       </div>
+
+      {/* Override Modal */}
+      {overrideModal.show && overrideModal.booking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-gray-900">Override Booking</h3>
+              <button onClick={handleCloseOverride} className="text-gray-500 hover:text-gray-700">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="mb-6 rounded-lg bg-blue-50 p-4">
+              <p className="text-sm font-semibold text-blue-900">Booking: {overrideModal.booking.booking_reference}</p>
+              <p className="text-xs text-blue-700">Customer: {overrideModal.booking.customer_name}</p>
+              <p className="text-xs text-blue-700">Space: {overrideModal.booking.bay_code} | Date: {overrideModal.booking.booking_date}</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Override Action *</label>
+                <select
+                  value={overrideForm.action}
+                  onChange={(e) => setOverrideForm({ ...overrideForm, action: e.target.value })}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="cancel">Cancel Booking</option>
+                  <option value="reassign">Reassign Parking Space</option>
+                  <option value="modify_time">Modify Booking Time</option>
+                </select>
+              </div>
+
+              {overrideForm.action === 'reassign' && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">New Parking Space *</label>
+                  <select
+                    value={overrideForm.new_space_id}
+                    onChange={(e) => setOverrideForm({ ...overrideForm, new_space_id: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="">Select a space</option>
+                    {availableSpaces.map(space => (
+                      <option key={space.id} value={space.id}>
+                        {space.bay_code} - {space.category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {overrideForm.action === 'modify_time' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">New Start Time *</label>
+                    <input
+                      type="time"
+                      value={overrideForm.new_start_time}
+                      onChange={(e) => setOverrideForm({ ...overrideForm, new_start_time: e.target.value })}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">New End Time *</label>
+                    <input
+                      type="time"
+                      value={overrideForm.new_end_time}
+                      onChange={(e) => setOverrideForm({ ...overrideForm, new_end_time: e.target.value })}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Reason for Override *</label>
+                <textarea
+                  value={overrideForm.reason}
+                  onChange={(e) => setOverrideForm({ ...overrideForm, reason: e.target.value })}
+                  rows={3}
+                  placeholder="Provide a detailed reason for this override..."
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleCloseOverride}
+                  className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitOverride}
+                  disabled={submitting || !overrideForm.reason.trim()}
+                  className="flex-1 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
+                >
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : 'Confirm Override'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -18,6 +18,7 @@ const SiteLayout = () => {
 
   const [sites, setSites] = useState([])
   const [allSpaces, setAllSpaces] = useState([])
+  const [categories, setCategories] = useState([])
   const [selectedSpace, setSelectedSpace] = useState(null)
   const [showBookingModal, setShowBookingModal] = useState(false)
   const [bookingForm, setBookingForm] = useState({
@@ -36,6 +37,7 @@ const SiteLayout = () => {
   useEffect(() => {
     fetchSites()
     fetchAllSpaces()
+    fetchCategories()
   }, [])
 
   const fetchSites = async () => {
@@ -62,6 +64,15 @@ const SiteLayout = () => {
       setToast({ message: 'Failed to load parking spaces', type: 'error' })
     } finally {
       setLoading(prev => ({ ...prev, spaces: false }))
+    }
+  }
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get('/api/categories')
+      setCategories(response.data)
+    } catch (err) {
+      console.error('Failed to load categories:', err)
     }
   }
 
@@ -108,14 +119,61 @@ const SiteLayout = () => {
     }
   }
 
-  const getSpaceClasses = (space) => {
+  const getCategoryColor = (space) => {
+    if (space.category_id) {
+      const cat = categories.find(c => c.id === space.category_id)
+      return cat?.color_code || '#3B82F6'
+    }
+    // Fallback to old category string
+    const colorMap = {
+      'standard': '#3B82F6',
+      'disabled': '#EF4444',
+      'ev': '#10B981',
+      'visitor': '#F59E0B',
+      'vip': '#8B5CF6'
+    }
+    return colorMap[space.category?.toLowerCase()] || '#3B82F6'
+  }
+
+  const getSpaceStyle = (space) => {
+    const categoryColor = getCategoryColor(space)
+    
     if (!space.is_active || ['blocked', 'maintenance'].includes(space.status)) {
-      return 'bg-gray-300 text-gray-600 cursor-not-allowed'
+      // Blocked/Maintenance: Very dark with low opacity
+      return { 
+        backgroundColor: categoryColor, 
+        color: '#FFFFFF', 
+        cursor: 'not-allowed', 
+        opacity: 0.3,
+        filter: 'grayscale(50%)'
+      }
     }
     if (['occupied', 'reserved'].includes(space.status)) {
-      return 'bg-gray-400 text-gray-700 cursor-not-allowed'
+      // Occupied/Reserved: Show category color but darker and with diagonal stripes
+      return { 
+        backgroundColor: categoryColor, 
+        color: '#FFFFFF', 
+        cursor: 'not-allowed', 
+        opacity: 0.5,
+        backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,.1) 10px, rgba(255,255,255,.1) 20px)'
+      }
     }
-    return 'bg-white text-gray-900 hover:bg-green-50 cursor-pointer border-green-200'
+    // Available: Full bright category color
+    return { 
+      backgroundColor: categoryColor, 
+      color: '#FFFFFF', 
+      cursor: 'pointer' 
+    }
+  }
+
+  const getSpaceClasses = (space) => {
+    if (!space.is_active || ['blocked', 'maintenance'].includes(space.status)) {
+      return 'cursor-not-allowed'
+    }
+    if (['occupied', 'reserved'].includes(space.status)) {
+      return 'cursor-not-allowed'
+    }
+    return 'hover:ring-2 hover:ring-white hover:shadow-lg cursor-pointer transform hover:scale-105 transition-all'
   }
 
   const groupSpacesForSite = (siteId) => {
@@ -195,15 +253,36 @@ const SiteLayout = () => {
 
         {/* Filter indicator + Legend */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4 text-sm">
-            <span className="flex items-center gap-2">
-              <span className="h-4 w-4 rounded border border-gray-400 bg-gray-400"></span>
-              <span className="text-gray-700">Occupied</span>
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="h-4 w-4 rounded border border-gray-300 bg-white"></span>
-              <span className="text-gray-700">Vacant</span>
-            </span>
+          <div className="flex items-center gap-6 text-sm">
+            <div className="flex items-center gap-4">
+              <span className="font-semibold text-gray-900">Legend:</span>
+              <span className="flex items-center gap-2">
+                <span className="h-5 w-8 rounded border border-white" style={{ backgroundColor: '#3B82F6' }}></span>
+                <span className="text-gray-700">Available</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span 
+                  className="h-5 w-8 rounded border border-white" 
+                  style={{ 
+                    backgroundColor: '#3B82F6', 
+                    opacity: 0.5,
+                    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,.2) 4px, rgba(255,255,255,.2) 8px)'
+                  }}
+                ></span>
+                <span className="text-gray-700">Occupied/Reserved</span>
+              </span>
+            </div>
+            {categories.length > 0 && (
+              <div className="flex items-center gap-3 border-l border-gray-300 pl-6">
+                <span className="text-xs font-medium text-gray-600">Categories:</span>
+                {categories.map(cat => (
+                  <span key={cat.id} className="flex items-center gap-1.5">
+                    <span className="h-4 w-4 rounded border border-white" style={{ backgroundColor: cat.color_code }}></span>
+                    <span className="text-xs text-gray-700">{cat.name}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           {filterSiteId && (
             <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700">
@@ -253,7 +332,8 @@ const SiteLayout = () => {
                                 key={space.id}
                                 onClick={() => handleSpaceClick(space)}
                                 disabled={space.status !== 'available' || !space.is_active}
-                                className={`rounded border px-1 py-1.5 text-[10px] font-semibold transition-colors ${getSpaceClasses(space)}`}
+                                style={getSpaceStyle(space)}
+                                className={`rounded border border-white px-1 py-1.5 text-[10px] font-semibold transition-all ${getSpaceClasses(space)}`}
                               >
                                 {space.bay_code}
                               </button>

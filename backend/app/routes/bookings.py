@@ -7,7 +7,7 @@ from app.models.user import User
 from app.models.booking import Booking
 from app.models.parking_space import ParkingSpace
 from app.models.visitor_booking import VisitorBooking
-from app.schemas.booking import BookingCreate, BookingUpdate, BookingResponse
+from app.schemas.booking import BookingCreate, BookingUpdate, BookingResponse, BookingOverride
 from app.utils.auth import get_current_user, require_role
 from app.utils.logger import log_activity
 
@@ -36,7 +36,11 @@ def serialize_booking(booking: Booking) -> BookingResponse:
         created_by=booking.created_by,
         booking_reference=build_booking_reference(booking),
         site_name=booking.site.name if booking.site else None,
-        bay_code=booking.space.bay_code if booking.space else None
+        bay_code=booking.space.bay_code if booking.space else None,
+        overridden=booking.overridden if hasattr(booking, 'overridden') else False,
+        override_reason=booking.override_reason if hasattr(booking, 'override_reason') else None,
+        overridden_by=booking.overridden_by if hasattr(booking, 'overridden_by') else None,
+        overridden_at=booking.overridden_at if hasattr(booking, 'overridden_at') else None
     )
 
 def check_space_availability(db: Session, space_id: int, booking_date, start_time, end_time, exclude_booking_id=None):
@@ -247,28 +251,100 @@ def reject_booking(
     
     return {"message": "Booking rejected successfully"}
 
-@router.patch("/{booking_id}/override")
+@router.post("/{booking_id}/override")
 def override_booking(
     booking_id: int,
+    override_data: BookingOverride,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["manager", "admin"]))
+    current_user: User = Depends(require_role(["manager"]))
 ):
+    """
+    Override a booking with one of three actions:
+    - cancel: Cancel the booking
+    - reassign: Move to a different parking space
+    - modify_time: Change booking time
+    """
+    from datetime import datetime
+    
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     
-    booking.status = "cancelled"
-    space = db.query(ParkingSpace).filter(ParkingSpace.id == booking.space_id).first()
-    if space:
-        active_bookings = db.query(Booking).filter(
-            Booking.space_id == booking.space_id,
-            Booking.id != booking.id,
-            Booking.status == "active"
-        ).count()
-        if active_bookings == 0:
-            space.status = "available"
+    if not override_data.reason or len(override_data.reason.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Override reason is required")
+    
+    old_space = db.query(ParkingSpace).filter(ParkingSpace.id == booking.space_id).first()
+    action_description = ""
+    
+    # Mark as overridden
+    booking.overridden = True
+    booking.override_reason = override_data.reason
+    booking.overridden_by = current_user.id
+    booking.overridden_at = datetime.now()
+    
+    if override_data.action == "cancel":
+        # Cancel the booking
+        booking.status = "cancelled"
+        if old_space:
+            active_bookings = db.query(Booking).filter(
+                Booking.space_id == booking.space_id,
+                Booking.id != booking.id,
+                Booking.status == "active"
+            ).count()
+            if active_bookings == 0:
+                old_space.status = "available"
+        action_description = f"Cancelled booking {booking_id}"
+        
+    elif override_data.action == "reassign":
+        # Reassign to new space
+        if not override_data.new_space_id:
+            raise HTTPException(status_code=400, detail="new_space_id is required for reassign action")
+        
+        new_space = db.query(ParkingSpace).filter(ParkingSpace.id == override_data.new_space_id).first()
+        if not new_space:
+            raise HTTPException(status_code=404, detail="New parking space not found")
+        
+        if new_space.status != "available":
+            raise HTTPException(status_code=400, detail="New parking space is not available")
+        
+        # Free old space
+        if old_space:
+            active_bookings = db.query(Booking).filter(
+                Booking.space_id == booking.space_id,
+                Booking.id != booking.id,
+                Booking.status == "active"
+            ).count()
+            if active_bookings == 0:
+                old_space.status = "available"
+        
+        # Assign new space
+        booking.space_id = override_data.new_space_id
+        new_space.status = "reserved"
+        action_description = f"Reassigned booking {booking_id} from {old_space.bay_code if old_space else 'N/A'} to {new_space.bay_code}"
+        
+    elif override_data.action == "modify_time":
+        # Modify booking time
+        if not override_data.new_start_time or not override_data.new_end_time:
+            raise HTTPException(status_code=400, detail="new_start_time and new_end_time are required for modify_time action")
+        
+        if override_data.new_end_time <= override_data.new_start_time:
+            raise HTTPException(status_code=400, detail="End time must be after start time")
+        
+        old_time = f"{booking.start_time}-{booking.end_time}"
+        booking.start_time = override_data.new_start_time
+        booking.end_time = override_data.new_end_time
+        action_description = f"Modified booking {booking_id} time from {old_time} to {override_data.new_start_time}-{override_data.new_end_time}"
+        
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action. Must be 'cancel', 'reassign', or 'modify_time'")
+    
     db.commit()
+    db.refresh(booking)
     
-    log_activity(db, current_user.id, f"Overrode booking {booking_id}", "booking", booking.id)
+    log_activity(db, current_user.id, f"{action_description}. Reason: {override_data.reason}", "booking", booking.id)
     
-    return {"message": "Booking overridden successfully"}
+    return {
+        "message": "Booking overridden successfully",
+        "action": override_data.action,
+        "booking": serialize_booking(booking)
+    }

@@ -7,6 +7,8 @@ from .visitor_bookings import router as visitor_bookings_router
 from .reports import router as reports_router
 from .logs import router as logs_router
 from .guidance import router as guidance_router
+from .categories import router as categories_router
+from .layout import router as layout_router
 
 __all__ = [
     "auth_router",
@@ -17,5 +19,7 @@ __all__ = [
     "visitor_bookings_router",
     "reports_router",
     "logs_router",
-    "guidance_router"
+    "guidance_router",
+    "categories_router",
+    "layout_router"
 ]

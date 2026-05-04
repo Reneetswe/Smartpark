@@ -10,7 +10,9 @@ from app.routes import (
     visitor_bookings_router,
     reports_router,
     logs_router,
-    guidance_router
+    guidance_router,
+    categories_router,
+    layout_router
 )
 import os
 from dotenv import load_dotenv
@@ -47,6 +49,8 @@ app.include_router(visitor_bookings_router)
 app.include_router(reports_router)
 app.include_router(logs_router)
 app.include_router(guidance_router)
+app.include_router(categories_router)
+app.include_router(layout_router)
 
 @app.get("/")
 def root():
