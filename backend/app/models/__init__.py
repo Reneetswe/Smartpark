@@ -1,5 +1,6 @@
 from .user import User, Role
 from .site import Site
+from .parking_category import ParkingCategory
 from .parking_space import ParkingSpace
 from .booking import Booking
 from .visitor_booking import VisitorBooking
@@ -11,6 +12,7 @@ __all__ = [
     "User",
     "Role",
     "Site",
+    "ParkingCategory",
     "ParkingSpace",
     "Booking",
     "VisitorBooking",
