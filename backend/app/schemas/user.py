@@ -3,7 +3,7 @@ from typing import Optional, TYPE_CHECKING
 from datetime import datetime
 
 class UserLogin(BaseModel):
-    email: str = Field(..., pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
+    email: str
     password: str
 
 class UserResponse(BaseModel):
@@ -29,7 +29,7 @@ class Token(BaseModel):
 
 class UserCreate(BaseModel):
     full_name: str
-    email: str = Field(..., pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
+    email: str
     password: str
     role_id: int
     employee_number: Optional[str] = None
@@ -39,7 +39,7 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
-    email: Optional[str] = Field(None, pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
+    email: Optional[str] = None
     role_id: Optional[int] = None
     employee_number: Optional[str] = None
     contact_number: Optional[str] = None
