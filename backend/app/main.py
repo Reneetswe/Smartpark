@@ -15,15 +15,20 @@ from app.routes import (
     layout_router
 )
 import os
+import sys
+import traceback
 from dotenv import load_dotenv
 
 load_dotenv()
 
+print("SmartPark API starting...", file=sys.stderr)
+
 try:
     Base.metadata.create_all(bind=engine)
-    print("Database tables created/verified successfully")
+    print("Database tables created/verified successfully", file=sys.stderr)
 except Exception as e:
-    print(f"Warning: Could not create tables: {e}")
+    print(f"Warning: Could not create tables: {e}", file=sys.stderr)
+    traceback.print_exc()
 
 app = FastAPI(title="SmartPark API", version="1.0.0")
 
