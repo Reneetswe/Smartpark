@@ -19,7 +19,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+    print("Database tables created/verified successfully")
+except Exception as e:
+    print(f"Warning: Could not create tables: {e}")
 
 app = FastAPI(title="SmartPark API", version="1.0.0")
 

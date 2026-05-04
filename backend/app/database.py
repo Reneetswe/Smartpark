@@ -9,6 +9,13 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is not set")
+
+# Fix for SQLAlchemy 2.x: postgres:// is not supported, must use postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 # Configure engine for Neon PostgreSQL with proper SSL and connection handling
 engine = create_engine(
     DATABASE_URL,
