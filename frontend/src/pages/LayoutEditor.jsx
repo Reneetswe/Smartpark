@@ -145,8 +145,7 @@ const LayoutEditor = () => {
       'standard': '#3B82F6',
       'disabled': '#EF4444',
       'ev': '#10B981',
-      'visitor': '#F59E0B',
-      'vip': '#8B5CF6'
+      'visitor': '#F59E0B'
     }
     return colorMap[space.category?.toLowerCase()] || '#3B82F6'
   }

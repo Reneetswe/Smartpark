@@ -29,7 +29,6 @@ def migrate():
                 ParkingCategory(name="Disabled", color_code="#EF4444"),
                 ParkingCategory(name="EV Charging", color_code="#10B981"),
                 ParkingCategory(name="Visitor", color_code="#F59E0B"),
-                ParkingCategory(name="VIP", color_code="#8B5CF6"),
             ]
             
             db.add_all(categories)
@@ -42,7 +41,6 @@ def migrate():
             "disabled": "Disabled",
             "ev": "EV Charging",
             "visitor": "Visitor",
-            "vip": "VIP",
         }
         
         # Get all categories

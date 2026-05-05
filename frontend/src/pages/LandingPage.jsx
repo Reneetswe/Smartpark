@@ -157,7 +157,7 @@ const LandingPage = () => {
                   <CheckCircle className="h-6 w-6 text-green-500 mt-1 flex-shrink-0" />
                   <div>
                     <h4 className="font-semibold text-gray-900">Priority Booking</h4>
-                    <p className="text-gray-600">VIP and management priority access</p>
+                    <p className="text-gray-600">Management priority access</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
