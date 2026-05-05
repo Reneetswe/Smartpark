@@ -4,7 +4,7 @@ import Card from '../components/Card'
 import Toast from '../components/Toast'
 import axios from '../api/axios'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { Building, Car, AlertTriangle, TrendingUp, CheckCircle, XCircle, RefreshCcw, Ban, Loader2, Eye, AlertCircle, Clock, MapPin, X } from 'lucide-react'
+import { Building, Car, AlertTriangle, TrendingUp, CheckCircle, XCircle, RefreshCcw, Loader2, Eye, AlertCircle, Clock, MapPin, X } from 'lucide-react'
 
 const ManagerDashboard = () => {
   const [sites, setSites] = useState([])
@@ -14,7 +14,6 @@ const ManagerDashboard = () => {
   const [utilizationData, setUtilizationData] = useState([])
   const [toast, setToast] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [cancellingId, setCancellingId] = useState(null)
   const [overrideModal, setOverrideModal] = useState({ show: false, booking: null })
   const [overrideForm, setOverrideForm] = useState({ action: 'cancel', reason: '', new_space_id: '', new_start_time: '', new_end_time: '' })
   const [availableSpaces, setAvailableSpaces] = useState([])
@@ -138,18 +137,6 @@ const ManagerDashboard = () => {
     }
   }
 
-  const handleCancelBooking = async (bookingId) => {
-    try {
-      setCancellingId(bookingId)
-      await axios.patch(`/api/bookings/${bookingId}/cancel`)
-      setToast({ message: 'Booking cancelled successfully', type: 'success' })
-      fetchDashboardData()
-    } catch (error) {
-      setToast({ message: error.response?.data?.detail || 'Error cancelling booking', type: 'error' })
-    } finally {
-      setCancellingId(null)
-    }
-  }
 
   const totalSpaces = siteStats.reduce((sum, stat) => sum + stat.total_spaces, 0)
   const totalAvailable = siteStats.reduce((sum, stat) => sum + stat.available, 0)
@@ -354,20 +341,11 @@ const ManagerDashboard = () => {
                           <>
                             <button
                               onClick={() => handleOpenOverride(booking)}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-50"
-                              title="Override Booking"
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50"
+                              title="Override Booking (Cancel, Reassign, or Modify)"
                             >
                               <AlertCircle className="h-3 w-3" />
                               Override
-                            </button>
-                            <button
-                              onClick={() => handleCancelBooking(booking.id)}
-                              disabled={cancellingId === booking.id}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-red-700 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50"
-                              title="Cancel Booking"
-                            >
-                              {cancellingId === booking.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3 w-3" />}
-                              Cancel
                             </button>
                           </>
                         )}
