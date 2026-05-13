@@ -76,6 +76,16 @@ const SiteLayout = () => {
     }
   }
 
+  const refreshCategories = async () => {
+    try {
+      const response = await axios.get('/api/categories')
+      setCategories(response.data)
+      setToast({ message: 'Categories refreshed', type: 'success' })
+    } catch (err) {
+      setToast({ message: 'Failed to refresh categories', type: 'error' })
+    }
+  }
+
   const handleSpaceClick = (space) => {
     if (space.status === 'available' && space.is_active) {
       setSelectedSpace(space)
@@ -280,6 +290,12 @@ const SiteLayout = () => {
                     <span className="text-xs text-gray-700">{cat.name}</span>
                   </span>
                 ))}
+                <button
+                  onClick={refreshCategories}
+                  className="text-xs text-blue-600 hover:text-blue-700 ml-2"
+                >
+                  Refresh
+                </button>
               </div>
             )}
           </div>

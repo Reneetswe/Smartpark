@@ -50,6 +50,16 @@ const LayoutEditor = () => {
     }
   }
 
+  const refreshCategories = async () => {
+    try {
+      const response = await axios.get('/api/categories')
+      setCategories(response.data)
+      setToast({ message: 'Categories refreshed', type: 'success' })
+    } catch (error) {
+      setToast({ message: 'Failed to refresh categories', type: 'error' })
+    }
+  }
+
   const fetchSpaces = async (siteId) => {
     try {
       const response = await axios.get(`/api/spaces?site_id=${siteId}`)
@@ -102,6 +112,8 @@ const LayoutEditor = () => {
       await axios.patch('/api/layout/spaces/positions', { updates })
       setToast({ message: 'Layout saved successfully', type: 'success' })
       setHasChanges(false)
+      // Refresh spaces to confirm the save worked
+      await fetchSpaces(selectedSite)
     } catch (error) {
       setToast({ message: 'Failed to save layout', type: 'error' })
     } finally {
@@ -202,10 +214,18 @@ const LayoutEditor = () => {
               </div>
 
               <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Grid3x3 className="h-4 w-4" />
-                  Legend
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <Grid3x3 className="h-4 w-4" />
+                    Legend
+                  </h3>
+                  <button
+                    onClick={refreshCategories}
+                    className="text-xs text-blue-600 hover:text-blue-700"
+                  >
+                    Refresh
+                  </button>
+                </div>
                 <div className="space-y-2 text-xs">
                   {categories.map(cat => (
                     <div key={cat.id} className="flex items-center gap-2">
