@@ -63,6 +63,10 @@ const LayoutEditor = () => {
     try {
       const response = await axios.get('/api/categories')
       setCategories(response.data)
+      // Force spaces to re-render with new colors by re-fetching them
+      if (selectedSite) {
+        await fetchSpaces(selectedSite)
+      }
       setToast({ message: 'Categories refreshed', type: 'success' })
     } catch (error) {
       setToast({ message: 'Failed to refresh categories', type: 'error' })

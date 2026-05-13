@@ -89,6 +89,8 @@ const SiteLayout = () => {
     try {
       const response = await axios.get('/api/categories')
       setCategories(response.data)
+      // Force spaces to re-render with new colors by re-fetching them
+      await fetchAllSpaces()
       setToast({ message: 'Categories refreshed', type: 'success' })
     } catch (err) {
       setToast({ message: 'Failed to refresh categories', type: 'error' })
