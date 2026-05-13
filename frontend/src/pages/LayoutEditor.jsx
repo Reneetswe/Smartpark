@@ -14,6 +14,7 @@ const LayoutEditor = () => {
   const [categories, setCategories] = useState([])
   const [draggingSpace, setDraggingSpace] = useState(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
   const [editingSpace, setEditingSpace] = useState(null)
   const [toast, setToast] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -92,11 +93,13 @@ const LayoutEditor = () => {
       y: e.clientY - rect.top
     })
     setDraggingSpace(space)
+    setIsDragging(false)
   }
 
   const handleMouseMove = (e) => {
     if (!draggingSpace || !gridRef.current) return
 
+    setIsDragging(true)
     const gridRect = gridRef.current.getBoundingClientRect()
     const newX = Math.max(0, Math.min(e.clientX - gridRect.left - dragOffset.x, gridRect.width - 60))
     const newY = Math.max(0, Math.min(e.clientY - gridRect.top - dragOffset.y, gridRect.height - 60))
@@ -122,12 +125,15 @@ const LayoutEditor = () => {
         pos_y: s.pos_y || 0
       }))
 
-      await axios.patch('/api/layout/spaces/positions', { updates })
+      console.log('Saving positions:', updates)
+      const response = await axios.patch('/api/layout/spaces/positions', { updates })
+      console.log('Save response:', response.data)
       setToast({ message: 'Layout saved successfully', type: 'success' })
       setHasChanges(false)
       // Refresh spaces to confirm the save worked
       await fetchSpaces(selectedSite)
     } catch (error) {
+      console.error('Save error:', error)
       setToast({ message: 'Failed to save layout', type: 'error' })
     } finally {
       setSaving(false)
@@ -140,6 +146,12 @@ const LayoutEditor = () => {
   }
 
   const handleEditSpace = (space) => {
+    // Don't open edit modal if we just finished dragging
+    if (isDragging) {
+      setIsDragging(false)
+      return
+    }
+    
     setEditingSpace({
       ...space,
       category_id: space.category_id || categories[0]?.id
