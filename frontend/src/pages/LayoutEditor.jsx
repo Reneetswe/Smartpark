@@ -186,18 +186,24 @@ const LayoutEditor = () => {
   }
 
   const getCategoryColor = (space) => {
+    // Try to find by category_id first
     if (space.category_id) {
       const cat = categories.find(c => c.id === space.category_id)
-      return cat?.color_code || '#3B82F6'
+      if (cat) return cat.color_code
     }
-    // Fallback to old category string
-    const colorMap = {
-      'standard': '#3B82F6',
-      'disabled': '#EF4444',
-      'ev': '#10B981',
-      'visitor': '#F59E0B'
+    
+    // Fallback: match by category name (case-insensitive)
+    if (space.category && categories.length > 0) {
+      const cat = categories.find(c => 
+        c.name.toLowerCase() === space.category.toLowerCase() ||
+        c.name.toLowerCase().includes(space.category.toLowerCase()) ||
+        space.category.toLowerCase().includes(c.name.toLowerCase())
+      )
+      if (cat) return cat.color_code
     }
-    return colorMap[space.category?.toLowerCase()] || '#3B82F6'
+    
+    // Final fallback to blue
+    return '#3B82F6'
   }
 
   return (
@@ -252,18 +258,10 @@ const LayoutEditor = () => {
               </div>
 
               <div className="mt-6 pt-6 border-t border-gray-200">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <Grid3x3 className="h-4 w-4" />
-                    Legend
-                  </h3>
-                  <button
-                    onClick={refreshCategories}
-                    className="text-xs text-blue-600 hover:text-blue-700"
-                  >
-                    Refresh
-                  </button>
-                </div>
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Grid3x3 className="h-4 w-4" />
+                  Legend
+                </h3>
                 <div className="space-y-2 text-xs">
                   {categories.map(cat => (
                     <div key={cat.id} className="flex items-center gap-2">

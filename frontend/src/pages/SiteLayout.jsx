@@ -149,18 +149,24 @@ const SiteLayout = () => {
   }
 
   const getCategoryColor = (space) => {
+    // Try to find by category_id first
     if (space.category_id) {
       const cat = categories.find(c => c.id === space.category_id)
-      return cat?.color_code || '#3B82F6'
+      if (cat) return cat.color_code
     }
-    // Fallback to old category string
-    const colorMap = {
-      'standard': '#3B82F6',
-      'disabled': '#EF4444',
-      'ev': '#10B981',
-      'visitor': '#F59E0B'
+    
+    // Fallback: match by category name (case-insensitive)
+    if (space.category && categories.length > 0) {
+      const cat = categories.find(c => 
+        c.name.toLowerCase() === space.category.toLowerCase() ||
+        c.name.toLowerCase().includes(space.category.toLowerCase()) ||
+        space.category.toLowerCase().includes(c.name.toLowerCase())
+      )
+      if (cat) return cat.color_code
     }
-    return colorMap[space.category?.toLowerCase()] || '#3B82F6'
+    
+    // Final fallback to blue
+    return '#3B82F6'
   }
 
   const getSpaceStyle = (space) => {
@@ -309,12 +315,6 @@ const SiteLayout = () => {
                     <span className="text-xs text-gray-700">{cat.name}</span>
                   </span>
                 ))}
-                <button
-                  onClick={refreshCategories}
-                  className="text-xs text-blue-600 hover:text-blue-700 ml-2"
-                >
-                  Refresh
-                </button>
               </div>
             )}
           </div>

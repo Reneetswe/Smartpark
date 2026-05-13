@@ -7,6 +7,7 @@ class ParkingSpaceResponse(BaseModel):
     site_id: int
     bay_code: str
     category: str
+    category_id: Optional[int] = None
     status: str
     is_priority_only: bool
     is_active: bool
