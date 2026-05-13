@@ -31,6 +31,15 @@ const LayoutEditor = () => {
     }
   }, [selectedSite])
 
+  // Auto-refresh categories when they change in other tabs
+  useEffect(() => {
+    const handleCategoryChange = () => {
+      refreshCategories()
+    }
+    window.addEventListener('category-changed', handleCategoryChange)
+    return () => window.removeEventListener('category-changed', handleCategoryChange)
+  }, [])
+
   const fetchData = async () => {
     try {
       setLoading(true)

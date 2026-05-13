@@ -50,6 +50,8 @@ const CategorySettings = () => {
       setToast({ message: 'Category updated successfully', type: 'success' })
       setEditingId(null)
       fetchCategories()
+      // Notify other tabs/pages that categories have changed
+      window.dispatchEvent(new Event('category-changed'))
     } catch (error) {
       setToast({ message: error.response?.data?.detail || 'Failed to update category', type: 'error' })
     } finally {
@@ -65,6 +67,8 @@ const CategorySettings = () => {
       setShowAddModal(false)
       setNewCategory({ name: '', color_code: '#3B82F6' })
       fetchCategories()
+      // Notify other tabs/pages that categories have changed
+      window.dispatchEvent(new Event('category-changed'))
     } catch (error) {
       setToast({ message: error.response?.data?.detail || 'Failed to create category', type: 'error' })
     } finally {
@@ -79,6 +83,8 @@ const CategorySettings = () => {
       await axios.delete(`/api/categories/${categoryId}`)
       setToast({ message: 'Category deleted successfully', type: 'success' })
       fetchCategories()
+      // Notify other tabs/pages that categories have changed
+      window.dispatchEvent(new Event('category-changed'))
     } catch (error) {
       setToast({ message: error.response?.data?.detail || 'Failed to delete category', type: 'error' })
     }

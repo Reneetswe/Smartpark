@@ -40,6 +40,15 @@ const SiteLayout = () => {
     fetchCategories()
   }, [])
 
+  // Auto-refresh categories when they change in other tabs
+  useEffect(() => {
+    const handleCategoryChange = () => {
+      refreshCategories()
+    }
+    window.addEventListener('category-changed', handleCategoryChange)
+    return () => window.removeEventListener('category-changed', handleCategoryChange)
+  }, [])
+
   const fetchSites = async () => {
     try {
       setLoading(prev => ({ ...prev, sites: true }))
