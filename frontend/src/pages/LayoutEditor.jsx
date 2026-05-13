@@ -41,6 +41,19 @@ const LayoutEditor = () => {
     return () => window.removeEventListener('category-changed', handleCategoryChange)
   }, [])
 
+  // Poll for category changes every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await axios.get('/api/categories')
+        setCategories(response.data)
+      } catch (error) {
+        console.error('Failed to poll categories:', error)
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
   const fetchData = async () => {
     try {
       setLoading(true)

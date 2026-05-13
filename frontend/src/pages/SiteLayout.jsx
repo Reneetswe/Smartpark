@@ -49,6 +49,14 @@ const SiteLayout = () => {
     return () => window.removeEventListener('category-changed', handleCategoryChange)
   }, [])
 
+  // Poll for category changes every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchCategories()
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
   const fetchSites = async () => {
     try {
       setLoading(prev => ({ ...prev, sites: true }))
